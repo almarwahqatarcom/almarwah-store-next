@@ -44,6 +44,13 @@ export interface SiteSettings {
   tagline?: { en?: string; ar?: string };
   footerBgColor?: string;
   addressOverride?: string;
+  // Real store links — rendered as "Get it on Google Play" / "Download on
+  // the App Store" badges in the footer (Footer.tsx), under Get In Touch.
+  // Either can be set independently; a badge only renders when its own
+  // URL is actually set, so a fresh install shows neither rather than a
+  // dead link to nowhere.
+  googlePlayUrl?: string;
+  appStoreUrl?: string;
   // Overrides the live backend's own pixel id (normally read from a plain
   // text file it hosts at /fb.txt — see getFacebookPixelId() in api.ts).
   // Set here, it takes priority everywhere that file's value is used

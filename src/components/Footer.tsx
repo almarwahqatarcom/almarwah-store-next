@@ -50,16 +50,47 @@ export default function Footer() {
           </div>
           <div>
             <h4 className="text-white text-[13.5px] font-bold uppercase tracking-wide mb-4">{t("footer.getInTouch")}</h4>
-            <ul className="flex flex-col gap-2.5 text-[13.5px]">
+            <ul className="flex flex-col gap-2.5 text-[13.5px] mb-5">
               <li>📞 {config.ecommerce_phone}</li>
               <li>✉️ {config.ecommerce_email}</li>
               <li>📍 {address}</li>
             </ul>
+            {(siteSettings.googlePlayUrl || siteSettings.appStoreUrl) && (
+              <div className="flex flex-col gap-2">
+                {siteSettings.googlePlayUrl && (
+                  <a
+                    href={siteSettings.googlePlayUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl px-3.5 py-2 transition-colors w-fit"
+                  >
+                    <span className="text-xl leading-none">▶️</span>
+                    <span className="leading-tight">
+                      <span className="block text-[9.5px] text-white/60">{t("footer.getItOn")}</span>
+                      <span className="block text-[13px] font-bold text-white">Google Play</span>
+                    </span>
+                  </a>
+                )}
+                {siteSettings.appStoreUrl && (
+                  <a
+                    href={siteSettings.appStoreUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl px-3.5 py-2 transition-colors w-fit"
+                  >
+                    <span className="text-xl leading-none"></span>
+                    <span className="leading-tight">
+                      <span className="block text-[9.5px] text-white/60">{t("footer.downloadOnThe")}</span>
+                      <span className="block text-[13px] font-bold text-white">App Store</span>
+                    </span>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap justify-between items-center gap-2.5 pt-5 text-[12.5px]">
           <span>© {new Date().getFullYear()} {siteName}. {t("footer.rightsReserved")}</span>
-          <span>{t("footer.pricesNote")}</span>
         </div>
       </div>
     </footer>

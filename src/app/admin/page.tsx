@@ -570,6 +570,37 @@ function Dashboard() {
           />
         </section>
 
+        {/* Mobile App Links */}
+        <section className="bg-white border border-am-border rounded-2xl p-6">
+          <h2 className="font-bold text-am-text mb-1">📱 Mobile App Links</h2>
+          <p className="text-[12px] text-am-text-muted mb-4">
+            Shown as download badges in the footer, under Get In Touch. Each badge only appears once its own link is set — leave either blank to
+            hide it.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[12px] font-semibold text-am-text-muted mb-1.5">▶️ Google Play URL</label>
+              <input
+                type="text"
+                value={settings.googlePlayUrl ?? ""}
+                onChange={(e) => setSettings((s) => ({ ...s, googlePlayUrl: e.target.value }))}
+                placeholder="https://play.google.com/store/apps/details?id=..."
+                className="w-full border border-am-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-am-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-am-text-muted mb-1.5"> App Store URL</label>
+              <input
+                type="text"
+                value={settings.appStoreUrl ?? ""}
+                onChange={(e) => setSettings((s) => ({ ...s, appStoreUrl: e.target.value }))}
+                placeholder="https://apps.apple.com/app/id..."
+                className="w-full border border-am-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-am-primary"
+              />
+            </div>
+          </div>
+        </section>
+
         {/* Facebook Pixel */}
         <section className="bg-white border border-am-border rounded-2xl p-6">
           <h2 className="font-bold text-am-text mb-1">Facebook Pixel</h2>

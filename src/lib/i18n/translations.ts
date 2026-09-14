@@ -75,7 +75,8 @@ export const translations = {
     "footer.legal": "Legal",
     "footer.policyLink": "Privacy Policy & Terms",
     "footer.rightsReserved": "All rights reserved.",
-    "footer.pricesNote": "Prices shown are for browsing — checkout available directly on this site.",
+    "footer.getItOn": "GET IT ON",
+    "footer.downloadOnThe": "Download on the",
 
     // ── Home page ───────────────────────────────────────────────────────
     "home.popularCategories": "Popular Categories",
@@ -447,7 +448,8 @@ export const translations = {
     "footer.legal": "قانوني",
     "footer.policyLink": "سياسة الخصوصية والشروط",
     "footer.rightsReserved": "جميع الحقوق محفوظة.",
-    "footer.pricesNote": "الأسعار المعروضة للتصفح فقط — إتمام الشراء متاح مباشرة عبر هذا الموقع.",
+    "footer.getItOn": "احصل عليه من",
+    "footer.downloadOnThe": "حمّل التطبيق من",
 
     "home.popularCategories": "الفئات الأكثر شيوعًا",
     "home.dailyNeeds": "الاحتياجات اليومية",
