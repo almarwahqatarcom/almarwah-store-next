@@ -6,6 +6,7 @@ import CountdownPromosSection from "@/components/admin/CountdownPromosSection";
 import ExitOfferSection, { emptyExitOffer } from "@/components/admin/ExitOfferSection";
 import VisitorsSection from "@/components/admin/VisitorsSection";
 import { useAdminSessionStore } from "@/lib/store/adminSession";
+import { useStoreConfig } from "@/lib/store/config";
 
 // Everything here talks to src/app/api/admin/* — see those route files for
 // the actual auth/persistence mechanics (httpOnly session cookie, JSON file
@@ -155,6 +156,7 @@ const THEME_FIELDS: { key: keyof NonNullable<SiteSettings["theme"]>; label: stri
 
 function Dashboard() {
   const adminLogout = useAdminSessionStore((s) => s.logout);
+  const { config } = useStoreConfig();
   const [activeTab, setActiveTab] = useState<Tab>("branding");
   const [settings, setSettings] = useState<SiteSettings>({});
   const [loaded, setLoaded] = useState(false);
@@ -228,13 +230,33 @@ function Dashboard() {
     return saveNow({ exitOffer: offer });
   }
 
+  // Uploading a real logo is also the moment an admin is most likely
+  // setting up branding for the first time — so this fills in the Site
+  // Name/Tagline fields with the actual real values already live on the
+  // site (config.ecommerce_name from the backend; the tagline the header
+  // already shows by default — see header.since in translations.ts) rather
+  // than leaving them blank for the admin to retype from scratch. Never
+  // overwrites a field that already has something in it — a field left
+  // untouched here always means "the admin deliberately typed this",
+  // logo upload or not.
   function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setLogoUploading(true);
     const reader = new FileReader();
     reader.onload = () => {
-      setSettings((s) => ({ ...s, logoUrl: reader.result as string }));
+      setSettings((s) => ({
+        ...s,
+        logoUrl: reader.result as string,
+        siteName: {
+          en: s.siteName?.en || config.ecommerce_name,
+          ar: s.siteName?.ar || "المروة أونلاين",
+        },
+        tagline: {
+          en: s.tagline?.en || "Since 2003 · Qatar",
+          ar: s.tagline?.ar || "منذ 2003 · قطر",
+        },
+      }));
       setLogoUploading(false);
     };
     reader.onerror = () => setLogoUploading(false);
