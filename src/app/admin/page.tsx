@@ -742,6 +742,27 @@ function Dashboard() {
           </section>
 
           <section className="bg-white border border-am-border rounded-2xl p-6">
+            <h2 className="font-bold text-am-text mb-1">🔥 Microsoft Clarity</h2>
+            <p className="text-[12px] text-am-text-muted mb-4">
+              Free heatmaps and session recordings — see exactly how real visitors scroll, click, and move through your pages, and which sessions
+              actually placed an order. From clarity.microsoft.com → Settings → Setup, just the project id at the end of the tag URL (
+              <code className="bg-am-bg px-1 py-0.5 rounded text-[11px]">clarity.ms/tag/</code>
+              <strong>XXXXXXXXXX</strong>). <strong>Storefront only</strong> — never loads on this dashboard itself.
+            </p>
+            <input
+              type="text"
+              value={settings.seo?.microsoftClarityId ?? ""}
+              onChange={(e) => setSettings((s) => ({ ...s, seo: { ...s.seo, microsoftClarityId: e.target.value.trim() } }))}
+              placeholder="e.g. abc123def4"
+              className="w-full max-w-sm border border-am-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-am-primary"
+            />
+            <p className="text-[11px] text-am-text-faint mt-2">
+              Every order placed (Cash on Delivery or Sadad) automatically tags that visitor&apos;s session as &ldquo;order_placed&rdquo; in Clarity, with the
+              order value — filter by that event in Clarity&apos;s own dashboard to watch recordings of customers who actually bought something.
+            </p>
+          </section>
+
+          <section className="bg-white border border-am-border rounded-2xl p-6">
             <h2 className="font-bold text-am-text mb-1">Google Search Console</h2>
             <p className="text-[12px] text-am-text-muted mb-4">
               From Search Console → Settings → Ownership verification → HTML tag — paste only the <code className="bg-am-bg px-1 py-0.5 rounded text-[11px]">content=&quot;...&quot;</code> value,

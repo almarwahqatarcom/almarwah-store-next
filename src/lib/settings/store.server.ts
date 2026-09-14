@@ -102,6 +102,14 @@ export interface SeoSettings {
   // metadata field, which is the officially supported way to emit that tag
   // without hand-writing it into <head>.
   googleSiteVerification?: string;
+  // Microsoft Clarity project id (Clarity → Settings → Setup → the id in
+  // the snippet URL, e.g. https://www.clarity.ms/tag/XXXXXXXXXX — just
+  // that trailing id, not the whole snippet). Loads clarity.js client-side
+  // — see ClarityTracker.tsx/clarity.ts — the same "admin sets just the
+  // id, the app builds the real snippet" pattern as GA/the Facebook Pixel.
+  // Deliberately storefront-only, never on /admin itself — see
+  // ClarityTracker.tsx's own docblock for the honest limits of that.
+  microsoftClarityId?: string;
 }
 
 // A "don't abandon your cart" popup shown ON THE CHECKOUT PAGE ITSELF,

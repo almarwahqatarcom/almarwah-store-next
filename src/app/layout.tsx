@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import VisitorTracker from "@/components/VisitorTracker";
 import FacebookPixelTracker from "@/components/FacebookPixelTracker";
 import GoogleAnalyticsTracker from "@/components/GoogleAnalyticsTracker";
+import ClarityTracker from "@/components/ClarityTracker";
 import { getConfig, getCategories, getFacebookPixelId } from "@/lib/api";
 import { getServerLocale } from "@/lib/i18n/server";
 import { isRtl } from "@/lib/i18n/t";
@@ -104,6 +105,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // SiteSettings.facebookPixelId's docblock.
   const pixelId = siteSettings.facebookPixelId?.trim() || remotePixelId;
   const gaId = siteSettings.seo?.googleAnalyticsId?.trim() || null;
+  const clarityId = siteSettings.seo?.microsoftClarityId?.trim() || null;
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
   // The public API being unreachable at build/request time is the one case
@@ -135,6 +137,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <VisitorTracker />
                 <FacebookPixelTracker pixelId={pixelId} />
                 <GoogleAnalyticsTracker gaId={gaId} />
+                <ClarityTracker clarityId={clarityId} />
               </Suspense>
               <Header />
               <main className="flex-1">{children}</main>

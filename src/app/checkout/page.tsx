@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/store/auth";
 import { useStoreConfig } from "@/lib/store/config";
 import * as api from "@/lib/api";
 import { trackInitiateCheckout, trackPurchase } from "@/lib/fbPixel";
+import { trackClarityPurchase } from "@/lib/clarity";
 import { useLanguage } from "@/lib/store/language";
 import { useSiteSettings } from "@/lib/store/siteSettings";
 import CheckoutAccountModal from "@/components/CheckoutAccountModal";
@@ -542,6 +543,7 @@ export default function CheckoutPage() {
     };
     const res = await api.placeOrder(payload, { token, guestId: orderGuestId });
     trackPurchase({ value: total, content_ids: items.map((i) => i.product_id) });
+    trackClarityPurchase(res.order_id, total, paymentMethod);
     await clear(token);
     // Guests have no token to view the auth-gated /account/orders/[id], so
     // they get a self-contained confirmation instead of a login wall right

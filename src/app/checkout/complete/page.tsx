@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth";
 import { useCartStore } from "@/lib/store/cart";
 import { trackPurchase } from "@/lib/fbPixel";
+import { trackClarityPurchase } from "@/lib/clarity";
 import { useLanguage } from "@/lib/store/language";
 import GuestUpgradePrompt from "@/components/GuestUpgradePrompt";
 
@@ -72,7 +73,9 @@ function CheckoutCompleteBody() {
       try {
         const stashed = sessionStorage.getItem("am-pending-purchase-value");
         sessionStorage.removeItem("am-pending-purchase-value");
-        trackPurchase({ value: stashed ? Number(stashed) : 0 });
+        const value = stashed ? Number(stashed) : 0;
+        trackPurchase({ value });
+        trackClarityPurchase(gatewayToken?.reference || gatewayToken?.ref || "sadad", value, "sadad");
       } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
