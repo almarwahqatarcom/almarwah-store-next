@@ -9,6 +9,7 @@ import { useStoreConfig } from "@/lib/store/config";
 import * as api from "@/lib/api";
 import { normalizeQatarPhone } from "@/lib/phone";
 import OrderProgressTracker from "@/components/OrderProgressTracker";
+import InvoiceDocument, { type InvoiceItem, type InvoiceOrder } from "@/components/InvoiceDocument";
 import { playChime } from "@/lib/chime";
 import type { TimeSlot } from "@/lib/types";
 
@@ -26,30 +27,20 @@ import type { TimeSlot } from "@/lib/types";
 // feed isn't something this backend can offer.
 const POLL_INTERVAL_MS = 10000;
 
-type OrderItemDetail = {
-  id?: number;
-  product_details?: { name?: string };
-  quantity?: number;
-  price?: number;
-};
+// Extends the shared invoice contract (InvoiceDocument.tsx) rather than
+// re-declaring it — getOrderDetailsByPhone hits the exact same backend
+// endpoint as the authenticated getOrderDetails() (just phone instead of
+// token, confirmed in api.ts), so the raw response already carries every
+// field a real invoice needs; this page just wasn't reading them before
+// "Download Invoice" existed.
+type OrderItemDetail = InvoiceItem;
 
-type OrderSummary = {
-  id: number;
-  order_amount?: number;
+type OrderSummary = InvoiceOrder & {
   order_status?: string;
-  payment_method?: string;
-  payment_status?: string;
-  order_type?: string;
-  created_at?: string;
   updated_at?: string;
   delivery_date?: string;
   time_slot_id?: number;
   delivery_man?: { f_name?: string; l_name?: string; phone?: string; image?: string | null } | null;
-  delivery_address?: {
-    contact_person_name?: string;
-    contact_person_number?: string;
-    address?: string;
-  } | null;
 };
 
 // The two shapes actually seen on real customer addresses in this backend:
@@ -80,6 +71,7 @@ export default function TrackOrderPage() {
   const [items, setItems] = useState<OrderItemDetail[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusToast, setStatusToast] = useState<string | null>(null);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   // What actually worked — reused by the polling effect so it doesn't have
   // to re-guess the phone format on every refresh.
@@ -252,6 +244,54 @@ export default function TrackOrderPage() {
           </div>,
           document.body
         )}
+      {showInvoice &&
+        order &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[95] bg-am-text/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-6 overflow-y-auto print:static print:inset-auto print:bg-transparent print:backdrop-blur-none print:p-0 print:block"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("track.downloadInvoice")}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowInvoice(false);
+            }}
+          >
+            {/* Printing normally prints the whole document, including this
+                overlay's own backdrop and the storefront chrome behind it —
+                this rule scopes @media print to show ONLY the invoice
+                itself, the standard "print just this element" technique
+                (hide everything, then re-reveal just the target subtree). */}
+            <style>{`@media print {
+              body * { visibility: hidden; }
+              #invoice-print-area, #invoice-print-area * { visibility: visible; }
+              #invoice-print-area { position: absolute; inset: 0; width: 100%; }
+            }`}</style>
+            <div className="w-full max-w-[850px] my-4 sm:my-0 print:my-0 print:max-w-none">
+              <div className="flex items-center justify-between mb-3 print:hidden">
+                <span className="text-white text-[12px] font-bold uppercase tracking-wide bg-white/10 px-3 py-1.5 rounded-full">{t("track.invoicePreview")}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-2 bg-am-primary hover:bg-am-primary-dark text-white text-[13px] font-bold px-5 py-2.5 rounded-full transition-colors shadow-[0_8px_20px_rgba(196,154,60,0.35)]"
+                  >
+                    {t("order.printInvoice")}
+                  </button>
+                  <button
+                    onClick={() => setShowInvoice(false)}
+                    aria-label={t("common.close")}
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <div id="invoice-print-area">
+                <InvoiceDocument order={order} items={items} />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
       {!order ? (
         <>
           <div className="text-center mb-8">
@@ -360,6 +400,12 @@ export default function TrackOrderPage() {
               <span>{t("track.total")}</span>
               <span className="text-am-primary-dark">{api.formatCurrency(order.order_amount ?? total, config)}</span>
             </div>
+            <button
+              onClick={() => setShowInvoice(true)}
+              className="flex items-center justify-center gap-2 border border-am-primary/40 text-am-primary-dark hover:bg-am-primary/5 font-bold text-[13.5px] py-3 rounded-xl transition-colors mt-1"
+            >
+              🧾 {t("track.downloadInvoice")}
+            </button>
           </div>
 
           {items.length > 0 && (
