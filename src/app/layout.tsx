@@ -39,6 +39,15 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     openGraph: { title, description, siteName: name, locale, type: "website" },
     twitter: { card: "summary_large_image", title, description },
+    // Admin-uploaded browser tab icon (Branding tab, same upload control as
+    // the header/footer logos), falling back to the site's static default
+    // (public/favicon.ico). Deliberately NOT using Next's src/app/favicon.ico
+    // file convention — that convention injects its own <link rel="icon">
+    // unconditionally, which would render alongside this one and leave two
+    // competing icon tags in <head> (confirmed live: both were present,
+    // with no reliable cross-browser rule for which one wins). Setting this
+    // explicitly, always, keeps exactly one icon tag, one source of truth.
+    icons: { icon: siteSettings.faviconUrl?.trim() || "/favicon.ico" },
     // Renders <meta name="google-site-verification" content="..."> when
     // set — the officially supported way to do Search Console's "HTML tag"
     // ownership verification through Next's metadata API rather than

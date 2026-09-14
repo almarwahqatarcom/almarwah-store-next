@@ -492,6 +492,16 @@ function Dashboard() {
             />
           </div>
 
+          <div className="mb-5">
+            <LogoUploadField
+              label="Favicon (Browser Tab Icon)"
+              hint="Shown in the browser tab, bookmarks, and history — a simple square image works best. Leave empty to use the site's default icon."
+              value={settings.faviconUrl ?? ""}
+              onChange={(v) => setSettings((s) => ({ ...s, faviconUrl: v }))}
+              maxDimension={128}
+            />
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-am-text-muted uppercase tracking-wide mb-1.5">Site Name — English</label>

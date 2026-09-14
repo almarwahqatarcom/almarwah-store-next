@@ -51,6 +51,12 @@ export interface SiteSettings {
   // dead link to nowhere.
   googlePlayUrl?: string;
   appStoreUrl?: string;
+  // The browser tab icon — a data: URI (uploaded via the same
+  // LogoUploadField control as the header/footer logos) or an external
+  // image URL. Rendered via generateMetadata()'s `icons` field in
+  // layout.tsx. Falls back to Next's own default /favicon.ico convention
+  // (the app already ships one under src/app/) when unset.
+  faviconUrl?: string;
   // Overrides the live backend's own pixel id (normally read from a plain
   // text file it hosts at /fb.txt — see getFacebookPixelId() in api.ts).
   // Set here, it takes priority everywhere that file's value is used
