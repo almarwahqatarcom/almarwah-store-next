@@ -164,6 +164,7 @@ function Dashboard() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState("");
+  const [autoFilledAt, setAutoFilledAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
@@ -299,7 +300,7 @@ function Dashboard() {
             ...s,
             logoUrl: dataUrl,
             siteName: {
-              en: s.siteName?.en || config.ecommerce_name,
+              en: s.siteName?.en || config.ecommerce_name || "AlMarwa Online",
               ar: s.siteName?.ar || "المروة أونلاين",
             },
             tagline: {
@@ -324,9 +325,14 @@ function Dashboard() {
             // ecommerce_address — see Header.tsx/Footer.tsx's own
             // fallback) — and the footer's real default background
             // (Footer.tsx falls back to bg-am-text, i.e. --am-text).
-            addressOverride: s.addressOverride || config.ecommerce_address,
+            addressOverride: s.addressOverride || config.ecommerce_address || "Doha Qatar",
             footerBgColor: s.footerBgColor || "#1A2942",
           }));
+          // A visible confirmation, not just a quiet field-value change —
+          // the actual bug report behind this whole feature was "I can't
+          // tell whether anything happened", so this makes it unmistakable
+          // that the auto-fill really did run.
+          setAutoFilledAt(Date.now());
         } catch {
           setLogoError("Something went wrong processing that image. Please try a different file.");
         } finally {
@@ -512,6 +518,12 @@ function Dashboard() {
         <section className="bg-white border border-am-border rounded-2xl p-6">
           <h2 className="font-bold text-am-text mb-1">Logo & Site Name</h2>
           <p className="text-[12px] text-am-text-muted mb-4">Overrides the logo, name, and tagline shown in the header, footer, and browser tab. Leave a field blank to use the store&apos;s default.</p>
+          {autoFilledAt && (
+            <div className="flex items-center justify-between gap-3 bg-am-success/10 border border-am-success/30 text-am-success text-[12.5px] font-semibold rounded-xl px-4 py-3 mb-4">
+              <span>✨ Logo uploaded — Site Name, Tagline, Theme Colors, Address and Footer below were filled in with the site&apos;s real values. Scroll down to review, then click Save Changes.</span>
+              <button onClick={() => setAutoFilledAt(null)} className="shrink-0 text-am-success/70 hover:text-am-success">✕</button>
+            </div>
+          )}
           <div className="flex items-center gap-4 mb-5">
             {settings.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSiteSettings } from "@/lib/store/siteSettings";
+import { useAdminSessionStore } from "@/lib/store/adminSession";
 import { ExitOfferCard } from "@/components/ExitOfferCard";
 
 // A "don't abandon your cart" popup mounted directly on the checkout page
@@ -13,27 +14,30 @@ import { ExitOfferCard } from "@/components/ExitOfferCard";
 // genuinely still sitting on checkout, unpurchased. `hasDiscount` (already
 // applied a coupon) also cancels/suppresses it — no reason to nag someone
 // who's already got a discount.
+function sessionKeyFor(offer: { couponCode: string; headline: { en: string }; triggerSeconds: number }): string {
+  // Shown at most once per browser tab per *distinct offer* — keyed to the
+  // coupon/headline/seconds, not a flat boolean. A flat "shown" flag was
+  // the actual cause of a real "I enabled it and tested, it never opened"
+  // report: any earlier popup in that same tab (even a long-since-changed
+  // offer from a previous test) permanently suppressed every future one,
+  // with no visible sign why. Changing the offer's content now always
+  // gets a fresh chance to show; re-testing the exact same offer in the
+  // exact same tab still only shows once, which is the intended behavior
+  // for a real customer — see the admin-only "show it now" control below
+  // for testing that without needing to wait out that restriction.
+  return `am-checkout-offer-shown:${offer.couponCode}:${offer.headline.en}:${offer.triggerSeconds}`;
+}
+
 export default function CheckoutAbandonmentOffer({ onApply, hasDiscount }: { onApply: (code: string) => void; hasDiscount: boolean }) {
   const { exitOffer } = useSiteSettings();
+  const isAdmin = useAdminSessionStore((s) => s.isAdmin);
   const [visible, setVisible] = useState(false);
   const [applied, setApplied] = useState(false);
 
   useEffect(() => {
     if (!exitOffer?.enabled || !exitOffer.couponCode.trim() || hasDiscount) return;
 
-    // Shown at most once per browser tab per *distinct offer* — keyed to
-    // the coupon/headline/seconds, not a flat boolean. A flat "shown"
-    // flag was the actual cause of a real "I enabled it and tested, it
-    // never opened" report: any earlier popup in that same tab (even a
-    // long-since-changed offer from a previous test) permanently
-    // suppressed every future one, with no visible sign why. Changing the
-    // offer's content now always gets a fresh chance to show; re-testing
-    // the exact same offer in the exact same tab still only shows once,
-    // which is the intended behavior. The admin dashboard's own "Preview"
-    // button (ExitOfferSection.tsx) is the reliable way to check the
-    // current design at any time — it bypasses this storage check and the
-    // timer entirely.
-    const sessionKey = `am-checkout-offer-shown:${exitOffer.couponCode}:${exitOffer.headline.en}:${exitOffer.triggerSeconds}`;
+    const sessionKey = sessionKeyFor(exitOffer);
 
     let alreadyShown = false;
     try {
@@ -57,6 +61,31 @@ export default function CheckoutAbandonmentOffer({ onApply, hasDiscount }: { onA
 
     return () => clearTimeout(timer);
   }, [exitOffer, hasDiscount]);
+
+  // A small, admin-only shortcut for exactly the confusion that led here:
+  // "I enabled it, waited on checkout, nothing showed" is very often just
+  // the once-per-tab restriction above silently doing its job from an
+  // earlier test — with nothing on screen explaining why. Only ever
+  // rendered for a browser signed into /admin (useAdminSessionStore — the
+  // same shared session Header.tsx's own Dashboard/Logout link uses), so
+  // a real customer never sees it and it can't be used to spam the offer.
+  if (isAdmin && exitOffer?.enabled && exitOffer.couponCode.trim() && !hasDiscount && !visible) {
+    return (
+      <button
+        onClick={() => {
+          try {
+            sessionStorage.removeItem(sessionKeyFor(exitOffer));
+          } catch {
+            // ignore
+          }
+          setVisible(true);
+        }}
+        className="fixed bottom-4 end-4 z-[80] flex items-center gap-2 bg-am-text text-white text-[12px] font-bold px-4 py-2.5 rounded-full shadow-lg hover:bg-am-text/90 transition-colors"
+      >
+        🔧 Admin: show offer now
+      </button>
+    );
+  }
 
   if (!visible || !exitOffer) return null;
 
