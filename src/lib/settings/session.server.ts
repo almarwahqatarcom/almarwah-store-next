@@ -1,41 +1,36 @@
 // Server-only. A deliberately minimal session mechanism for the one-user
 // admin dashboard — no user table, no password hashing library dependency
-// beyond Node's own `crypto` (already built in), just a random opaque
-// token mapped to an expiry, stored server-side (never derivable from the
-// token itself) and handed to the browser only as an httpOnly cookie the
-// client-side JS can never read. This keeps the actual admin password out
-// of the browser entirely: it's compared once, server-side, in the login
-// route, against ADMIN_EMAIL/ADMIN_PASSWORD env vars that are never bundled
-// into client JS (only NEXT_PUBLIC_* vars are).
-import { promises as fs } from "fs";
-import path from "path";
-import { randomBytes, timingSafeEqual } from "crypto";
+// beyond Node's own `crypto` (already built in).
+//
+// Stateless signed token, NOT a server-side session store: the cookie
+// value itself is `${expiresAt}.${hmac}`, where the HMAC is computed over
+// expiresAt with ADMIN_SESSION_SECRET. Validating just means recomputing
+// that HMAC and checking it matches — there is nothing to read or write on
+// disk/in a database at all, so there's nothing for a redeploy to wipe.
+// This replaces an earlier design (a JSON file of issued tokens, later a
+// SITE_DATA_DIR variant of the same idea) that assumed one server with one
+// persistent disk; this app is actually deployed on a serverless host
+// where that file was wiped on every deploy, silently signing every admin
+// back out. The real, if minor, tradeoff of going stateless: logout can
+// only make the browser forget the cookie, not truly invalidate the token
+// early — a copy of it made before logout would still work until its own
+// 7-day expiry. For a single-admin dashboard already gated by
+// ADMIN_EMAIL/ADMIN_PASSWORD and only ever handed out as an httpOnly
+// cookie, that's a reasonable, common trade for "never silently logged out
+// by infrastructure you don't control the disk of" — worth knowing about,
+// not worth the complexity of a real revocation list for this use case.
+import { createHmac, timingSafeEqual } from "crypto";
 
-const FILE_PATH = path.join(process.cwd(), "data", "admin-sessions.json");
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 export const ADMIN_SESSION_COOKIE = "am-admin-session";
 
-interface Session {
-  token: string;
-  expiresAt: number;
+function secret(): string {
+  return process.env.ADMIN_SESSION_SECRET ?? "";
 }
 
-async function readSessions(): Promise<Session[]> {
-  try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    const list = JSON.parse(raw) as Session[];
-    // Prune expired entries on every read so this file never grows
-    // unbounded across repeated logins.
-    return list.filter((s) => s.expiresAt > Date.now());
-  } catch {
-    return [];
-  }
-}
-
-async function writeSessions(sessions: Session[]): Promise<void> {
-  await fs.mkdir(path.dirname(FILE_PATH), { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(sessions, null, 2), "utf8");
+function sign(expiresAt: number): string {
+  return createHmac("sha256", secret()).update(String(expiresAt)).digest("hex");
 }
 
 // Constant-time comparison — a plain `===` on credentials leaks how many
@@ -59,21 +54,30 @@ export function verifyCredentials(email: string, password: string): boolean {
 }
 
 export async function createSession(): Promise<string> {
-  const token = randomBytes(32).toString("hex");
-  const sessions = await readSessions();
-  sessions.push({ token, expiresAt: Date.now() + SESSION_TTL_MS });
-  await writeSessions(sessions);
-  return token;
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  return `${expiresAt}.${sign(expiresAt)}`;
 }
 
 export async function isValidSession(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
-  const sessions = await readSessions();
-  return sessions.some((s) => s.token === token);
+  if (!token || !secret()) return false;
+
+  const dot = token.indexOf(".");
+  if (dot < 1) return false;
+  const expiresAtStr = token.slice(0, dot);
+  const givenSig = token.slice(dot + 1);
+
+  const expiresAt = Number(expiresAtStr);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
+
+  const expectedSig = sign(expiresAt);
+  const givenBuf = Buffer.from(givenSig);
+  const expectedBuf = Buffer.from(expectedSig);
+  return givenBuf.length === expectedBuf.length && timingSafeEqual(givenBuf, expectedBuf);
 }
 
+// Nothing to actually revoke server-side (see the file docblock) — kept as
+// an async no-op so the login/logout routes calling it don't need to
+// change at all.
 export async function destroySession(token: string | undefined): Promise<void> {
-  if (!token) return;
-  const sessions = await readSessions();
-  await writeSessions(sessions.filter((s) => s.token !== token));
+  void token;
 }

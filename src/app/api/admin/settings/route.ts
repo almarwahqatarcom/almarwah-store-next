@@ -25,6 +25,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Invalid request." }, { status: 400 });
   }
 
-  const saved = await saveSiteSettings(body);
-  return NextResponse.json(saved);
+  try {
+    const saved = await saveSiteSettings(body);
+    return NextResponse.json(saved);
+  } catch (err) {
+    // saveSiteSettings throws when the Laravel backend rejects or can't be
+    // reached (see that function's own comment) — surfaced here as a clear
+    // message instead of a raw 500, since "nothing happened" with no
+    // explanation is exactly the confusing failure mode this whole storage
+    // migration exists to get rid of.
+    console.error("saveSiteSettings failed:", err);
+    return NextResponse.json({ message: "Couldn't save — the storage backend is unreachable or rejected the change. Try again shortly." }, { status: 502 });
+  }
 }

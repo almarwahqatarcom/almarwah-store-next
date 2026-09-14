@@ -1,14 +1,23 @@
-// Server-only. Persists admin-configurable site overrides to a JSON file
-// on disk — deliberately simple (no database) since this app runs as a
-// single, always-on Node process on a real server (not a stateless
-// serverless deploy), so a local file survives restarts and is shared by
-// every request/visitor, which is the whole point of an admin dashboard:
-// changes here must affect what every customer sees, not just localStorage
-// in the admin's own browser.
-import { promises as fs } from "fs";
-import path from "path";
+// Server-only. Persists admin-configurable site overrides through the real
+// Laravel backend (StorefrontController::getSettings/updateSettings — see
+// that controller's docblock) instead of a local file on this app's own
+// disk. A local file (the original design, and briefly a SITE_DATA_DIR
+// variant of it) only works on a single always-on server with a
+// persistent disk it fully controls; this app is actually deployed on a
+// serverless host with neither — every deploy replaces the filesystem
+// entirely, and even within one deploy, separate requests can land on
+// separate, isolated instances with no shared disk between them. Confirmed
+// live: an admin's saved logo/links were empty again after the very next
+// deploy. Routing storage through the Laravel backend (which already has
+// one real, shared database every instance talks to) fixes both — a save
+// survives redeploys, and is visible to every instance immediately.
+import { API_BASE } from "@/lib/api";
 
-const FILE_PATH = path.join(process.cwd(), "data", "site-settings.json");
+const STOREFRONT_API_SECRET = process.env.STOREFRONT_API_SECRET ?? "";
+
+function authHeaders(): Record<string, string> {
+  return { "X-Storefront-Internal-Secret": STOREFRONT_API_SECRET };
+}
 
 export interface SiteSettings {
   theme?: {
@@ -189,9 +198,19 @@ const EMPTY: SiteSettings = {};
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   try {
-    const raw = await fs.readFile(FILE_PATH, "utf8");
-    return JSON.parse(raw) as SiteSettings;
+    // no-store: this is read on nearly every page render (logo, theme,
+    // nav copy, …) and must reflect an admin's save immediately — a stale
+    // cached read here is exactly the "saved but not showing" bug this
+    // whole migration exists to fix, just moved from storage to caching.
+    const res = await fetch(`${API_BASE}/storefront/settings`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) return EMPTY;
+    return (await res.json()) as SiteSettings;
   } catch {
+    // Backend unreachable — same graceful "use defaults" fallback the
+    // local-file version had for a missing/corrupt file.
     return EMPTY;
   }
 }
@@ -208,7 +227,17 @@ export async function saveSiteSettings(patch: SiteSettings): Promise<SiteSetting
     seo: { ...current.seo, ...patch.seo },
     updatedAt: new Date().toISOString(),
   };
-  await fs.mkdir(path.dirname(FILE_PATH), { recursive: true });
-  await fs.writeFile(FILE_PATH, JSON.stringify(next, null, 2), "utf8");
+  // The merge above happens here, same as it always did — the backend
+  // does a plain overwrite of whatever full object it's given (see
+  // StorefrontController::updateSettings), it has no idea of this type's
+  // shape and isn't meant to.
+  const res = await fetch(`${API_BASE}/storefront/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(next),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save site settings (backend responded ${res.status})`);
+  }
   return next;
 }

@@ -1,76 +1,56 @@
-// Server-only. Visitor pageviews, one JSON object per line (JSON Lines —
-// not a single JSON array) appended to a file per calendar month
-// (data/visits/YYYY-MM.jsonl). Line-append is O(1) regardless of how big
-// the file already is, unlike the single-JSON-file pattern site-settings.ts
-// uses — the right tradeoff here since this file is written on nearly every
-// pageview (frequent, tiny writes) rather than occasionally from an admin
-// form (rare, whole-object writes). Monthly rotation also means a report
-// for "this month" only ever has to read one file, not the whole history.
-import { promises as fs } from "fs";
-import path from "path";
+// Server-only. Visitor pageviews, persisted through the real Laravel
+// backend (StorefrontController::logVisit/getVisits — see that
+// controller's docblock) instead of a local per-month JSON-Lines file
+// (data/visits/YYYY-MM.jsonl) on this app's own disk. The file-based
+// design — including a later SITE_DATA_DIR variant meant to survive a
+// redeploy that re-clones the app folder — still assumed one server with
+// one disk every request could see; this app is actually deployed on a
+// serverless host where separate requests can land on separate, isolated
+// instances with no shared disk between them at all, SITE_DATA_DIR or not.
+// That's exactly why visits were "logged" (the write itself never
+// errored) but never showed up in the admin report (a different instance
+// read from, which never saw that write). Routing through the backend's
+// own database — one real, shared store every instance talks to — fixes
+// that: a write from any instance is immediately visible to a read from
+// any other.
+import { API_BASE } from "@/lib/api";
 import type { VisitRecord, VisitsSummary } from "./types";
 
-const DIR = path.join(process.cwd(), "data", "visits");
+const STOREFRONT_API_SECRET = process.env.STOREFRONT_API_SECRET ?? "";
 
-function monthKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthFile(key: string): string {
-  return path.join(DIR, `${key}.jsonl`);
-}
-
-// Every calendar month touched by [from, to], inclusive — usually one, two
-// at the edge of a month boundary, or a handful for a wide custom range.
-function monthsBetween(from: Date, to: Date): string[] {
-  const keys: string[] = [];
-  const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
-  const end = new Date(to.getFullYear(), to.getMonth(), 1);
-  while (cursor <= end) {
-    keys.push(monthKey(cursor));
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-  return keys;
+function authHeaders(): Record<string, string> {
+  return { "X-Storefront-Internal-Secret": STOREFRONT_API_SECRET };
 }
 
 export async function logVisit(record: VisitRecord): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
-  const file = monthFile(monthKey(new Date(record.ts)));
-  await fs.appendFile(file, JSON.stringify(record) + "\n", "utf8");
+  // Same defensive posture the caller (/api/track-visit) already wraps
+  // this in — never let a tracking failure surface to the visitor — kept
+  // here too since logVisit is the one place that actually knows what
+  // "failure" looks like for this specific call.
+  await fetch(`${API_BASE}/storefront/visits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(record),
+    cache: "no-store",
+  });
 }
 
-// Reads every month file that overlaps [from, to] and returns the rows
-// actually inside that window, newest first. Malformed lines (a partial
-// write from a crash mid-append, say) are skipped rather than failing the
-// whole report — a broken analytics page is a worse outcome than one
-// missing row.
+// Backend returns rows already in VisitRecord's own field shape (see
+// StorefrontController::getVisits), newest first — no reshaping needed
+// here, just the HTTP round trip the local-file version used to do as a
+// directory read.
 export async function queryVisits(from: Date, to: Date): Promise<VisitRecord[]> {
-  const keys = monthsBetween(from, to);
-  const fromTime = from.getTime();
-  const toTime = to.getTime();
-  const rows: VisitRecord[] = [];
-
-  for (const key of keys) {
-    let raw: string;
-    try {
-      raw = await fs.readFile(monthFile(key), "utf8");
-    } catch {
-      continue; // no visits logged that month
-    }
-    for (const line of raw.split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const rec = JSON.parse(line) as VisitRecord;
-        const t = new Date(rec.ts).getTime();
-        if (t >= fromTime && t <= toTime) rows.push(rec);
-      } catch {
-        // skip malformed line
-      }
-    }
+  try {
+    const qs = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
+    const res = await fetch(`${API_BASE}/storefront/visits?${qs}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as VisitRecord[];
+  } catch {
+    return [];
   }
-
-  rows.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-  return rows;
 }
 
 export function summarize(rows: VisitRecord[]): VisitsSummary {

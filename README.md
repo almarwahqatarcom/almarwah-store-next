@@ -168,6 +168,75 @@ configuration error rather than failing silently. Until step 5 is deployed,
 sending and verifying codes both work fully — only the final login/signup
 step shows the graceful "not set up yet" message described above.
 
+## Storefront settings & visitor tracking backend
+
+`getSiteSettings`/`saveSiteSettings` (`src/lib/settings/store.server.ts`) and
+the visitor log (`src/lib/analytics/store.server.ts`) now store through the
+real Laravel backend instead of a local file on this app's own disk. That
+was a real, confirmed bug, not a hypothetical: this app is deployed on a
+serverless host with no persistent local disk at all — every deploy replaces
+the filesystem completely, and even within one deploy, separate requests can
+land on separate, isolated server instances with no shared disk between
+them. That's exactly why an admin's saved logo/app links were empty again
+after the very next deploy, and why visitor tracking looked like it was
+doing nothing (a visit written by one instance was invisible to the admin
+report reading from a different one) — a local file, no matter where it
+lives, cannot work as this app's storage on this kind of host.
+
+### Requires a Laravel backend addition (already written, not yet deployed)
+
+The migration, model, and controller already exist in the Laravel repo:
+
+- `database/migrations/2026_09_15_000000_create_storefront_settings_table.php`
+- `database/migrations/2026_09_15_000001_create_storefront_visits_table.php`
+- `app/Models/StorefrontSetting.php`, `app/Models/StorefrontVisit.php`
+- `app/Http/Controllers/Api/V1/StorefrontController.php`
+- A new `storefront` route group added to `routes/api/v1/api.php`
+
+Four endpoints, all under `/api/v1/storefront/`:
+`GET settings`, `PUT settings`, `POST visits`, `GET visits` — see
+`StorefrontController`'s own docblock for the full design. `GET settings`
+and `PUT settings`/`GET visits` all require a
+`X-Storefront-Internal-Secret` header matching `STOREFRONT_API_SECRET` in
+that server's `.env` (same trust model as `OTP_INTERNAL_SECRET` above);
+`POST visits` is public but rate-limited (`throttle:20,1`), matching how
+the OTP endpoint above already works.
+
+**To deploy:**
+1. Pull/copy those files into your actual Laravel server.
+2. Run `php artisan migrate` on that server — **I did not, and could not,
+   run this myself.** The Laravel checkout I read locally to write this
+   integration has a `.env` pointing at what looks like real production
+   database credentials, so I only ever read/wrote source files there,
+   never touched the database. Run the migration yourself, the normal way
+   you deploy backend changes.
+3. Add `STOREFRONT_API_SECRET=<same value as below>` to that server's own
+   `.env`.
+4. Set the same value in this app's `.env.local`/production env — a value
+   is already generated in `.env.local` for local dev; generate a
+   different one for production the same way (command in
+   `.env.local.example`).
+
+**Until that's deployed**, `getSiteSettings()`/`queryVisits()` fail closed
+to empty results (same graceful fallback the local-file version had for a
+missing/corrupt file) rather than erroring — the site still renders with
+defaults, it just can't show admin overrides or visitor data yet.
+
+### Admin login sessions — also fixed, no Laravel change needed
+
+`session.server.ts` had the identical bug (a JSON file of issued session
+tokens, wiped on every deploy, silently signing the admin back out). Fixed
+differently: the session cookie is now a stateless signed token (HMAC over
+an expiry, verified by recomputing it) instead of anything stored — nothing
+for a deploy to wipe, no Laravel change needed. Set
+`ADMIN_SESSION_SECRET` (a new required env var — a value is already in
+`.env.local`; generate a different one for production) or logins will
+correctly fail closed rather than silently accept unsigned sessions. One
+real, minor tradeoff worth knowing: since nothing is stored, "logout" can
+only make the browser forget the cookie — a copy of the token made before
+logout would still work until its own 7-day expiry. Reasonable for a
+single-admin dashboard behind a password, not worth a real revocation list.
+
 ## Known limitations — need action on your end, not more code
 
 - **Social login (Google/Facebook)** — removed from `/login`. The live
