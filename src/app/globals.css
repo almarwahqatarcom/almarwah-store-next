@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   AlMarwah — Next.js Storefront
+   Palette matches the LIVE Flutter app's theme (lib/theme/light_theme.dart +
+   lib/utill/color_resources.dart) as of the current production deploy. A
+   dark-green rebrand exists in a newer source branch but is not yet live —
+   swap the values below if/when that ships to shop.almarwah.qa.
+   ========================================================================== */
+
+:root {
+  --am-primary: #C49A3C;
+  --am-primary-dark: #AB8530;
+  --am-primary-light: #F0E4C8;
+  --am-bg: #F8F4E9;
+  --am-bg-alt: #EDE3CC;
+  --am-card: #FFFFFF;
+  --am-text: #1A2942;
+  --am-text-muted: #6B7280;
+  --am-text-faint: #9AA1A9;
+  --am-border: #E7DCC0;
+  --am-error: #FF5C00;
+  --am-success: #057237;
+  --am-info: #1692C9;
+  --am-rating: #FFBA08;
+}
+
+@theme inline {
+  --color-am-primary: var(--am-primary);
+  --color-am-primary-dark: var(--am-primary-dark);
+  --color-am-primary-light: var(--am-primary-light);
+  --color-am-bg: var(--am-bg);
+  --color-am-bg-alt: var(--am-bg-alt);
+  --color-am-card: var(--am-card);
+  --color-am-text: var(--am-text);
+  --color-am-text-muted: var(--am-text-muted);
+  --color-am-text-faint: var(--am-text-faint);
+  --color-am-border: var(--am-border);
+  --color-am-error: var(--am-error);
+  --color-am-success: var(--am-success);
+  --color-am-info: var(--am-info);
+  --color-am-rating: var(--am-rating);
+  --font-sans: var(--font-poppins);
+}
+
+body {
+  background: var(--am-bg);
+  color: var(--am-text);
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+.am-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.am-scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
+.am-scrollbar-thin::-webkit-scrollbar-thumb { background: var(--am-border); border-radius: 6px; }
+
+/* Fully hides the scrollbar (Firefox + Chrome/Safari/Edge) while the element
+   stays scrollable by touch, trackpad, drag, or wheel — used where a visible
+   track would look out of place, e.g. a pill-style nav row. */
+.am-scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.am-scrollbar-none::-webkit-scrollbar { display: none; }
+
+@keyframes am-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.am-fade-in { animation: am-fade-in 0.35s ease both; }
