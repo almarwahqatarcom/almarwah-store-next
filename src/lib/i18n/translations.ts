@@ -10,6 +10,7 @@ export const translations = {
     // ── SEO (server-side generateMetadata only — see category/[id]/page.tsx) ──
     "seo.categoryDescription": "Shop {category} at AlMarwa Online — quality products, fast delivery across Qatar, cash on delivery available.",
     "home.title": "Cleaning Supplies & Home Essentials in Qatar",
+    "upsell.title": "You Might Also Like",
 
     // ── Common ──────────────────────────────────────────────────────────
     "common.loading": "Loading…",
@@ -384,6 +385,7 @@ export const translations = {
   ar: {
     "seo.categoryDescription": "تسوّق {category} من المروة أونلاين — منتجات عالية الجودة، وتوصيل سريع في جميع أنحاء قطر، مع إمكانية الدفع عند الاستلام.",
     "home.title": "مستلزمات التنظيف واحتياجات المنزل في قطر",
+    "upsell.title": "قد يعجبك أيضًا",
 
     "common.loading": "جارٍ التحميل…",
     "common.save": "حفظ",

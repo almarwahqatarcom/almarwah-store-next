@@ -57,6 +57,12 @@ export interface SiteSettings {
   // defaults to enabled once this ships, same "on unless explicitly turned
   // off" default as suggestedProductsEnabled above.
   visitorTrackingEnabled?: boolean;
+  // Gates the small fixed-footer "slide" upsell bar (FooterUpsellBar.tsx)
+  // shown on product and category pages — 4 related products in a slim,
+  // auto-advancing bar the visitor can dismiss. Missing/undefined means
+  // enabled, same "on unless explicitly turned off" default as the other
+  // boolean feature toggles above.
+  footerUpsellEnabled?: boolean;
   countdownPromos?: CountdownPromo[];
   exitOffer?: ExitOffer;
   seo?: SeoSettings;

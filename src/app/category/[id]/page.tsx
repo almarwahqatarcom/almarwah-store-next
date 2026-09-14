@@ -7,6 +7,7 @@ import SortSelect from "@/components/SortSelect";
 import Pagination from "@/components/Pagination";
 import { getServerLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/t";
+import FooterUpsellBar from "@/components/FooterUpsellBar";
 
 export const revalidate = 120;
 
@@ -94,6 +95,12 @@ export default async function CategoryPage({
           <Pagination page={page} totalPages={totalPages} />
         </>
       )}
+
+      {/* A different slice than the grid's own first row, where one exists
+          — showing the exact same 4 products twice in one view would be a
+          strange sort of upsell. Falls back to the grid's own start when
+          the category is too small to offer a second, distinct slice. */}
+      <FooterUpsellBar products={visibleProducts.length > 4 ? visibleProducts.slice(4) : visibleProducts} />
     </div>
   );
 }

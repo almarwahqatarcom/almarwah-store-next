@@ -9,6 +9,7 @@ import ViewContentTracker from "@/components/ViewContentTracker";
 import ProductGallery from "@/components/ProductGallery";
 import StarRating from "@/components/StarRating";
 import CountdownPromoBanner from "@/components/CountdownPromoBanner";
+import FooterUpsellBar from "@/components/FooterUpsellBar";
 import { getServerLocale } from "@/lib/i18n/server";
 import { t, hasArabicText } from "@/lib/i18n/t";
 import { maskCustomerName } from "@/lib/maskName";
@@ -107,7 +108,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const lowStock = inStock && product.total_stock <= 10;
 
   const related = primaryCategoryId
-    ? await getCategoryProducts(primaryCategoryId, 8, 1, undefined, locale)
+    ? await getCategoryProducts(primaryCategoryId, 12, 1, undefined, locale)
         .then((r) => r.products.filter((p) => p.id !== productId))
         .catch(() => [])
     : [];
@@ -271,6 +272,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <ProductRow title={`${t(locale, "product.moreFrom")} ${primaryCategory?.name ?? t(locale, "product.thisCategory")}`} products={related} />
         </div>
       )}
+
+      <FooterUpsellBar products={related} />
     </div>
   );
 }

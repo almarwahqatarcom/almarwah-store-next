@@ -154,6 +154,44 @@ const THEME_FIELDS: { key: keyof NonNullable<SiteSettings["theme"]>; label: stri
   { key: "text", label: "Text", hint: "Body text color" },
 ];
 
+// Fills in Site Name/Tagline (both languages), Theme Colors, Address, and
+// Footer background with the actual real values already live on the site
+// — the same real defaults the storefront itself falls back to when these
+// fields are unset (config.ecommerce_name/ecommerce_address from the live
+// backend; the exact hex values globals.css itself defines for
+// --am-primary etc.; the header's own default tagline; Footer.tsx's own
+// bg-am-text fallback) — wherever a field is still genuinely empty. Never
+// overwrites a field that already has something in it: a value here always
+// either IS the real live one, or is whatever the admin deliberately typed.
+// Shared between the initial settings load (so the Branding tab shows real
+// values the moment it opens, not blank fields behind placeholder hints)
+// and the logo-upload handler below (same fields, same real values, same
+// non-destructive rule — a logo upload is just another likely moment to
+// fill in whatever's still blank).
+function withLiveDefaults(s: SiteSettings, config: { ecommerce_name?: string; ecommerce_address?: string }): SiteSettings {
+  return {
+    ...s,
+    siteName: {
+      en: s.siteName?.en || config.ecommerce_name || "AlMarwa Online",
+      ar: s.siteName?.ar || "المروة أونلاين",
+    },
+    tagline: {
+      en: s.tagline?.en || "Since 2003 · Qatar",
+      ar: s.tagline?.ar || "منذ 2003 · قطر",
+    },
+    theme: {
+      primary: s.theme?.primary || "#C49A3C",
+      primaryDark: s.theme?.primaryDark || "#AB8530",
+      primaryLight: s.theme?.primaryLight || "#F0E4C8",
+      bg: s.theme?.bg || "#F8F4E9",
+      bgAlt: s.theme?.bgAlt || "#EDE3CC",
+      text: s.theme?.text || "#1A2942",
+    },
+    addressOverride: s.addressOverride || config.ecommerce_address || "Doha Qatar",
+    footerBgColor: s.footerBgColor || "#1A2942",
+  };
+}
+
 function Dashboard() {
   const adminLogout = useAdminSessionStore((s) => s.logout);
   const { config } = useStoreConfig();
@@ -171,8 +209,12 @@ function Dashboard() {
   useEffect(() => {
     fetch("/api/admin/settings")
       .then((r) => r.json())
-      .then((d) => setSettings(d))
+      .then((d: SiteSettings) => setSettings(withLiveDefaults(d, config)))
       .finally(() => setLoaded(true));
+    // config is fetched once server-side and handed down via context — not
+    // expected to change during this page's lifetime, so intentionally
+    // excluded here to keep this a real "on mount" effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function setTheme(key: keyof NonNullable<SiteSettings["theme"]>, value: string) {
@@ -219,6 +261,10 @@ function Dashboard() {
   // fields that can be unsaved when it's flipped).
   function toggleSuggestedProducts(enabled: boolean) {
     return saveNow({ suggestedProductsEnabled: enabled });
+  }
+
+  function toggleFooterUpsell(enabled: boolean) {
+    return saveNow({ footerUpsellEnabled: enabled });
   }
 
   function toggleVisitorTracking(enabled: boolean) {
@@ -296,38 +342,7 @@ function Dashboard() {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           const dataUrl = canvas.toDataURL("image/png");
 
-          setSettings((s) => ({
-            ...s,
-            logoUrl: dataUrl,
-            siteName: {
-              en: s.siteName?.en || config.ecommerce_name || "AlMarwa Online",
-              ar: s.siteName?.ar || "المروة أونلاين",
-            },
-            tagline: {
-              en: s.tagline?.en || "Since 2003 · Qatar",
-              ar: s.tagline?.ar || "منذ 2003 · قطر",
-            },
-            // The site's real default palette — same hex values
-            // globals.css itself defines for --am-primary etc. — so a
-            // blank Theme Colors field no longer just shows a grey
-            // placeholder hint; it gets the actual value that's already
-            // live, ready to tweak from a real starting point instead of
-            // an empty box.
-            theme: {
-              primary: s.theme?.primary || "#C49A3C",
-              primaryDark: s.theme?.primaryDark || "#AB8530",
-              primaryLight: s.theme?.primaryLight || "#F0E4C8",
-              bg: s.theme?.bg || "#F8F4E9",
-              bgAlt: s.theme?.bgAlt || "#EDE3CC",
-              text: s.theme?.text || "#1A2942",
-            },
-            // The real address already shown site-wide (config's own
-            // ecommerce_address — see Header.tsx/Footer.tsx's own
-            // fallback) — and the footer's real default background
-            // (Footer.tsx falls back to bg-am-text, i.e. --am-text).
-            addressOverride: s.addressOverride || config.ecommerce_address || "Doha Qatar",
-            footerBgColor: s.footerBgColor || "#1A2942",
-          }));
+          setSettings((s) => withLiveDefaults({ ...s, logoUrl: dataUrl }, config));
           // A visible confirmation, not just a quiet field-value change —
           // the actual bug report behind this whole feature was "I can't
           // tell whether anything happened", so this makes it unmistakable
@@ -690,6 +705,27 @@ function Dashboard() {
               </button>
             </div>
           </section>
+
+          <section className="bg-white border border-am-border rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-am-text mb-1">🛍️ Footer Slide Upsell</h2>
+                <p className="text-[12px] text-am-text-muted">
+                  A small, closeable bar fixed to the bottom of every product and category page, auto-sliding through 4 related products. Turning
+                  this off hides it site-wide.
+                </p>
+              </div>
+              <button
+                onClick={() => toggleFooterUpsell(settings.footerUpsellEnabled === false)}
+                role="switch"
+                aria-checked={settings.footerUpsellEnabled !== false}
+                className={`shrink-0 w-12 h-7 rounded-full transition-colors relative ${settings.footerUpsellEnabled !== false ? "bg-am-primary" : "bg-am-border"}`}
+              >
+                <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.footerUpsellEnabled !== false ? "translate-x-6 rtl:-translate-x-6" : "translate-x-1 rtl:-translate-x-1"}`} />
+              </button>
+            </div>
+          </section>
+
           <CountdownPromosSection promos={settings.countdownPromos ?? []} onChange={setCountdownPromos} />
         </>
       )}
