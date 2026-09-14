@@ -163,6 +163,8 @@ function Dashboard() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   useEffect(() => {
@@ -239,32 +241,87 @@ function Dashboard() {
   // overwrites a field that already has something in it — a field left
   // untouched here always means "the admin deliberately typed this",
   // logo upload or not.
+  //
+  // The logo is stored as a plain data: URI (no file-storage server this
+  // simple JSON-file settings store could write to — see store.server.ts's
+  // own docblock) — but a real phone-camera photo can easily be several MB,
+  // and reading THAT straight into base64 and POSTing it as part of the
+  // settings JSON was the actual, reported bug here: nothing validated the
+  // size, nothing surfaced an error if it failed, so a real admin trying to
+  // upload a real photo saw... nothing happen. Fixed by downscaling through
+  // a canvas first — a logo only ever needs to render at a few dozen
+  // pixels tall in the header, so capping it at 320px on the long side
+  // keeps the resulting data: URI small (typically tens of KB) regardless
+  // of how large the original photo was — and by actually surfacing an
+  // error message instead of failing silently if something still goes
+  // wrong.
+  const MAX_LOGO_SOURCE_BYTES = 15 * 1024 * 1024; // sanity cap before even trying to process
+  const LOGO_MAX_DIMENSION = 320;
+
   function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the exact same file later
     if (!file) return;
+    setLogoError("");
+
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Please choose an image file (PNG, JPG, WEBP…).");
+      return;
+    }
+    if (file.size > MAX_LOGO_SOURCE_BYTES) {
+      setLogoError("That image is too large (max 15MB). Please choose a smaller file.");
+      return;
+    }
+
     setLogoUploading(true);
     const reader = new FileReader();
-    reader.onload = () => {
-      setSettings((s) => ({
-        ...s,
-        logoUrl: reader.result as string,
-        siteName: {
-          en: s.siteName?.en || config.ecommerce_name,
-          ar: s.siteName?.ar || "المروة أونلاين",
-        },
-        tagline: {
-          en: s.tagline?.en || "Since 2003 · Qatar",
-          ar: s.tagline?.ar || "منذ 2003 · قطر",
-        },
-      }));
+    reader.onerror = () => {
       setLogoUploading(false);
+      setLogoError("Couldn't read that file. Please try a different image.");
     };
-    reader.onerror = () => setLogoUploading(false);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => {
+        setLogoUploading(false);
+        setLogoError("That doesn't look like a valid image file.");
+      };
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("no 2d context");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/png");
+
+          setSettings((s) => ({
+            ...s,
+            logoUrl: dataUrl,
+            siteName: {
+              en: s.siteName?.en || config.ecommerce_name,
+              ar: s.siteName?.ar || "المروة أونلاين",
+            },
+            tagline: {
+              en: s.tagline?.en || "Since 2003 · Qatar",
+              ar: s.tagline?.ar || "منذ 2003 · قطر",
+            },
+          }));
+        } catch {
+          setLogoError("Something went wrong processing that image. Please try a different file.");
+        } finally {
+          setLogoUploading(false);
+        }
+      };
+      img.src = reader.result as string;
+    };
     reader.readAsDataURL(file);
   }
 
   async function save() {
     setSaving(true);
+    setSaveError("");
     try {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
@@ -275,7 +332,15 @@ function Dashboard() {
         setSettings(await res.json());
         setSavedAt(Date.now());
         setTimeout(() => setSavedAt(null), 2500);
+      } else {
+        // Previously silent — a failed save (payload too large for
+        // whatever's in front of this app in production, a dropped
+        // connection, etc.) looked identical to a successful one from the
+        // admin's side: nothing happened, no error, no confirmation either.
+        setSaveError(res.status === 413 ? "That's too much data to save at once — try a smaller logo image." : "Couldn't save changes. Please try again.");
       }
+    } catch {
+      setSaveError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -443,13 +508,20 @@ function Dashboard() {
               />
               <div className="flex items-center gap-3">
                 <input type="file" accept="image/*" onChange={onLogoFile} className="text-[12.5px]" />
-                {logoUploading && <span className="text-[12px] text-am-text-muted">Reading file…</span>}
+                {logoUploading && <span className="text-[12px] text-am-text-muted">Processing image…</span>}
                 {settings.logoUrl && (
-                  <button onClick={() => setSettings((s) => ({ ...s, logoUrl: "" }))} className="text-[12px] text-am-error font-semibold hover:underline">
+                  <button
+                    onClick={() => {
+                      setSettings((s) => ({ ...s, logoUrl: "" }));
+                      setLogoError("");
+                    }}
+                    className="text-[12px] text-am-error font-semibold hover:underline"
+                  >
                     Clear
                   </button>
                 )}
               </div>
+              {logoError && <p className="text-[12px] text-am-error font-semibold">{logoError}</p>}
             </div>
           </div>
 
@@ -735,6 +807,7 @@ function Dashboard() {
             {saving ? "Saving…" : "Save Changes"}
           </button>
           {savedAt && <span className="text-am-success text-sm font-semibold">✓ Saved.</span>}
+          {saveError && <span className="text-am-error text-sm font-semibold">{saveError}</span>}
         </div>
       </div>
     </div>
