@@ -134,12 +134,13 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-type Tab = "branding" | "promotions" | "exitOffer" | "content" | "visitors";
+type Tab = "branding" | "promotions" | "exitOffer" | "content" | "seo" | "visitors";
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "branding", label: "Branding & Theme", icon: "🎨" },
   { key: "promotions", label: "Promotions", icon: "🏷️" },
   { key: "exitOffer", label: "Checkout Abandonment", icon: "🎁" },
   { key: "content", label: "Page Content", icon: "📄" },
+  { key: "seo", label: "SEO & Analytics", icon: "🔍" },
   { key: "visitors", label: "Visitors", icon: "📊" },
 ];
 
@@ -604,6 +605,80 @@ function Dashboard() {
       </>
       )}
 
+      {activeTab === "seo" && (
+        <>
+          <section className="bg-white border border-am-border rounded-2xl p-6">
+            <h2 className="font-bold text-am-text mb-1">Default Meta Title &amp; Description</h2>
+            <p className="text-[12px] text-am-text-muted mb-4">
+              Shown in Google search results and browser tabs for the homepage (and as the fallback title suffix everywhere else). Product and
+              category pages already generate their own from real catalog data — this only covers what nothing else provides.
+            </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-am-text-muted uppercase tracking-wide mb-1.5">Meta Title</label>
+                <input
+                  type="text"
+                  value={settings.seo?.defaultTitle ?? ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, seo: { ...s.seo, defaultTitle: e.target.value } }))}
+                  placeholder="AlMarwa Online — Cleaning Supplies & Home Essentials in Qatar"
+                  maxLength={70}
+                  className="w-full border border-am-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-am-primary"
+                />
+                <p className="text-[11px] text-am-text-faint mt-1">{(settings.seo?.defaultTitle ?? "").length}/70 — Google truncates longer titles.</p>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-am-text-muted uppercase tracking-wide mb-1.5">Meta Description</label>
+                <textarea
+                  rows={3}
+                  value={settings.seo?.defaultDescription ?? ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, seo: { ...s.seo, defaultDescription: e.target.value } }))}
+                  placeholder="Shop quality cleaning products and household essentials in Qatar — fast delivery, cash on delivery available."
+                  maxLength={160}
+                  className="w-full border border-am-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-am-primary resize-y"
+                />
+                <p className="text-[11px] text-am-text-faint mt-1">{(settings.seo?.defaultDescription ?? "").length}/160 — Google truncates longer descriptions.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white border border-am-border rounded-2xl p-6">
+            <h2 className="font-bold text-am-text mb-1">Google Analytics</h2>
+            <p className="text-[12px] text-am-text-muted mb-4">
+              A GA4 Measurement ID (starts with &ldquo;G-&rdquo;) from Google Analytics → Admin → Data Streams → your web stream. Tracks every
+              pageview automatically once set — no code changes needed.
+            </p>
+            <input
+              type="text"
+              value={settings.seo?.googleAnalyticsId ?? ""}
+              onChange={(e) => setSettings((s) => ({ ...s, seo: { ...s.seo, googleAnalyticsId: e.target.value.trim() } }))}
+              placeholder="G-XXXXXXXXXX"
+              className="w-full max-w-sm border border-am-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-am-primary"
+            />
+            {settings.seo?.googleAnalyticsId && !/^G-[A-Z0-9]+$/i.test(settings.seo.googleAnalyticsId) && (
+              <p className="text-[11.5px] text-am-error mt-1.5">A real GA4 Measurement ID normally starts with &ldquo;G-&rdquo; — double-check this one.</p>
+            )}
+          </section>
+
+          <section className="bg-white border border-am-border rounded-2xl p-6">
+            <h2 className="font-bold text-am-text mb-1">Google Search Console</h2>
+            <p className="text-[12px] text-am-text-muted mb-4">
+              From Search Console → Settings → Ownership verification → HTML tag — paste only the <code className="bg-am-bg px-1 py-0.5 rounded text-[11px]">content=&quot;...&quot;</code> value,
+              not the whole tag. This renders it as a real <code className="bg-am-bg px-1 py-0.5 rounded text-[11px]">&lt;meta&gt;</code> tag in every page&apos;s
+              &lt;head&gt; so Google can confirm you own this site.
+            </p>
+            <input
+              type="text"
+              value={settings.seo?.googleSiteVerification ?? ""}
+              onChange={(e) => setSettings((s) => ({ ...s, seo: { ...s.seo, googleSiteVerification: e.target.value.trim() } }))}
+              placeholder="e.g. AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+              className="w-full max-w-sm border border-am-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-am-primary"
+            />
+          </section>
+
+          <SitemapInfoSection />
+        </>
+      )}
+
       {activeTab === "visitors" && (
         <>
           <section className="bg-white border border-am-border rounded-2xl p-6 mb-6">
@@ -641,5 +716,43 @@ function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Read-only — the sitemap and robots.txt (src/app/sitemap.ts,
+// src/app/robots.ts) are generated automatically from real live data
+// (every category, degrading gracefully to just the static pages if the
+// backend is briefly unreachable) and need no admin configuration at all.
+// This just gives the admin a direct, confident way to see and open them —
+// exactly what Search Console asks for when submitting a sitemap — rather
+// than having to already know these URLs exist.
+function SitemapInfoSection() {
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+  const base = origin || "";
+  return (
+    <section className="bg-white border border-am-border rounded-2xl p-6">
+      <h2 className="font-bold text-am-text mb-1">Sitemap &amp; Robots</h2>
+      <p className="text-[12px] text-am-text-muted mb-4">
+        Generated automatically — every active category, kept in sync with the live catalog. Nothing to configure; submit the sitemap URL below to
+        Search Console under Sitemaps.
+      </p>
+      <div className="flex flex-col gap-2 text-[13px]">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-am-text-muted w-24 shrink-0">Sitemap</span>
+          <a href={`${base}/sitemap.xml`} target="_blank" rel="noreferrer" className="text-am-primary-dark hover:underline truncate">
+            {base}/sitemap.xml
+          </a>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-am-text-muted w-24 shrink-0">Robots</span>
+          <a href={`${base}/robots.txt`} target="_blank" rel="noreferrer" className="text-am-primary-dark hover:underline truncate">
+            {base}/robots.txt
+          </a>
+        </div>
+      </div>
+    </section>
   );
 }

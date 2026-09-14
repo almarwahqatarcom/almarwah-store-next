@@ -59,7 +59,34 @@ export interface SiteSettings {
   visitorTrackingEnabled?: boolean;
   countdownPromos?: CountdownPromo[];
   exitOffer?: ExitOffer;
+  seo?: SeoSettings;
   updatedAt?: string;
+}
+
+// Site-wide SEO/analytics controls — everything here is genuinely global
+// (the homepage's own title/description, plus tracking snippets that fire
+// on every page), not per-product/per-category metadata: those already
+// come from real backend data (see product/[id]/page.tsx and
+// category/[id]/page.tsx's own generateMetadata()), so there's nothing for
+// an admin to usefully override there beyond what the catalog itself says.
+export interface SeoSettings {
+  // Falls back to config.ecommerce_name / the generic description in
+  // layout.tsx's generateMetadata() when unset — same "admin override,
+  // real fallback" pattern as siteName/tagline above.
+  defaultTitle?: string;
+  defaultDescription?: string;
+  // GA4 "Measurement ID" (starts with "G-"), from Google Analytics →
+  // Admin → Data Streams → your web stream. Loads gtag.js client-side —
+  // see GoogleAnalyticsTracker.tsx — the same "admin sets just the id,
+  // the app builds the real snippet" pattern as the Facebook Pixel.
+  googleAnalyticsId?: string;
+  // The bare verification code Google Search Console gives you for the
+  // "HTML tag" ownership-verification method (Settings → Ownership
+  // verification → HTML tag → just the `content="..."` value, not the
+  // whole <meta> tag) — rendered via Next's built-in `verification.google`
+  // metadata field, which is the officially supported way to emit that tag
+  // without hand-writing it into <head>.
+  googleSiteVerification?: string;
 }
 
 // A "don't abandon your cart" popup shown ON THE CHECKOUT PAGE ITSELF,
@@ -142,6 +169,7 @@ export async function saveSiteSettings(patch: SiteSettings): Promise<SiteSetting
     policy: { ...current.policy, ...patch.policy },
     siteName: { ...current.siteName, ...patch.siteName },
     tagline: { ...current.tagline, ...patch.tagline },
+    seo: { ...current.seo, ...patch.seo },
     updatedAt: new Date().toISOString(),
   };
   await fs.mkdir(path.dirname(FILE_PATH), { recursive: true });

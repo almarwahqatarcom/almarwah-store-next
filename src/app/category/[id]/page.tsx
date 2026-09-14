@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCategories, getCategoryProducts, isProductActive } from "@/lib/api";
+import { getCategories, getCategoryProducts, isProductActive, imageUrl, getConfig } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import SortSelect from "@/components/SortSelect";
 import Pagination from "@/components/Pagination";
@@ -14,6 +15,24 @@ const PER_PAGE = 24;
 // verified directly against admin.almarwah.qa/api/v1/categories/products,
 // not the values used by /products/all (which differ: "latest" etc).
 const SORT_VALUES = ["low_to_high", "high_to_low", "ascending", "descending"] as const;
+
+// Previously entirely missing — every category page fell back to the root
+// layout's own generic homepage title/description, so Google (and anyone
+// sharing a category link) saw "AlMarwa Online" for every single category
+// rather than the category's own real name.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const locale = await getServerLocale();
+  const [categories, config] = await Promise.all([getCategories(locale).catch(() => []), getConfig().catch(() => null)]);
+  const category = categories.find((c) => c.id === Number(id));
+  if (!category) return { title: "Category Not Found" };
+  const image = imageUrl(config?.base_urls, "category_image_url", category.image);
+  return {
+    title: category.name,
+    description: t(locale, "seo.categoryDescription").replace("{category}", category.name),
+    openGraph: { title: category.name, images: image ? [image] : undefined },
+  };
+}
 
 export default async function CategoryPage({
   params,

@@ -9,6 +9,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import VisitorTracker from "@/components/VisitorTracker";
 import FacebookPixelTracker from "@/components/FacebookPixelTracker";
+import GoogleAnalyticsTracker from "@/components/GoogleAnalyticsTracker";
 import { getConfig, getCategories, getFacebookPixelId } from "@/lib/api";
 import { getServerLocale } from "@/lib/i18n/server";
 import { isRtl } from "@/lib/i18n/t";
@@ -23,9 +24,27 @@ const poppins = Poppins({
 export async function generateMetadata(): Promise<Metadata> {
   const [config, siteSettings, locale] = await Promise.all([getConfig().catch(() => null), getSiteSettings(), getServerLocale()]);
   const name = siteSettings.siteName?.[locale] || config?.ecommerce_name || "AlMarwah";
+  const seo = siteSettings.seo;
+  const title = seo?.defaultTitle?.trim() || name;
+  const description = seo?.defaultDescription?.trim() || `Shop quality cleaning products and household essentials in Qatar — ${name}.`;
   return {
-    title: { default: name, template: `%s — ${name}` },
-    description: `Shop quality cleaning products and household essentials in Qatar — ${name}.`,
+    // Without this, Next.js resolves every relative Open Graph/Twitter
+    // image URL (and any page's own relative metadata) against
+    // http://localhost:3000 in production — silently breaking social-share
+    // previews site-wide. This was entirely unset before. Falls back to
+    // the same known-live domain sitemap.ts/robots.ts use.
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://shop.almarwah.qa"),
+    title: { default: title, template: `%s — ${name}` },
+    description,
+    openGraph: { title, description, siteName: name, locale, type: "website" },
+    twitter: { card: "summary_large_image", title, description },
+    // Renders <meta name="google-site-verification" content="..."> when
+    // set — the officially supported way to do Search Console's "HTML tag"
+    // ownership verification through Next's metadata API rather than
+    // hand-writing the tag. Omitted entirely (not even an empty tag) when
+    // unset, matching every other admin override's "no value, no trace"
+    // behavior in this file.
+    ...(seo?.googleSiteVerification?.trim() ? { verification: { google: seo.googleSiteVerification.trim() } } : {}),
   };
 }
 
@@ -84,6 +103,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // takes priority over the backend's own /fb.txt file — see
   // SiteSettings.facebookPixelId's docblock.
   const pixelId = siteSettings.facebookPixelId?.trim() || remotePixelId;
+  const gaId = siteSettings.seo?.googleAnalyticsId?.trim() || null;
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
   // The public API being unreachable at build/request time is the one case
@@ -114,6 +134,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <Suspense fallback={null}>
                 <VisitorTracker />
                 <FacebookPixelTracker pixelId={pixelId} />
+                <GoogleAnalyticsTracker gaId={gaId} />
               </Suspense>
               <Header />
               <main className="flex-1">{children}</main>

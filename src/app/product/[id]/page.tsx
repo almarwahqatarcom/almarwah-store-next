@@ -51,11 +51,20 @@ export const revalidate = 120;
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const locale = await getServerLocale();
-  const product = await getProductDetails(Number(id), locale).catch(() => null);
+  const [product, config] = await Promise.all([getProductDetails(Number(id), locale).catch(() => null), getConfig().catch(() => null)]);
   if (!product?.id) return { title: "Product Not Available" };
   const { name, description } = await withEnglishFallback(Number(id), product, locale);
   const plain = description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 155);
-  return { title: name, description: plain };
+  // A real product photo in the preview when a link is shared (WhatsApp,
+  // Facebook, etc.) matters a lot for a retail catalog — this was entirely
+  // missing before, so every shared product link showed no image at all.
+  const image = imageUrl(config?.base_urls, "product_image_url", product.image?.[0]);
+  return {
+    title: name,
+    description: plain,
+    openGraph: { title: name, description: plain, images: image ? [image] : undefined, type: "website" },
+    twitter: { card: image ? "summary_large_image" : "summary", title: name, description: plain, images: image ? [image] : undefined },
+  };
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {

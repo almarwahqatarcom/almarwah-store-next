@@ -7,6 +7,10 @@ export type Locale = "en" | "ar";
 
 export const translations = {
   en: {
+    // ── SEO (server-side generateMetadata only — see category/[id]/page.tsx) ──
+    "seo.categoryDescription": "Shop {category} at AlMarwa Online — quality products, fast delivery across Qatar, cash on delivery available.",
+    "home.title": "Cleaning Supplies & Home Essentials in Qatar",
+
     // ── Common ──────────────────────────────────────────────────────────
     "common.loading": "Loading…",
     "common.save": "Save",
@@ -347,7 +351,7 @@ export const translations = {
     "track.paymentStatus": "Payment Status",
     "track.stepPending": "Pending",
     "track.stepConfirmed": "Order Confirmed",
-    "track.stepProcessing": "Packed & Processed",
+    "track.stepProcessing": "Packaging",
     "track.stepDelivered": "Delivered",
     "track.stepOutForDelivery": "Out for Delivery",
     "track.stepCancelled": "Cancelled",
@@ -376,6 +380,9 @@ export const translations = {
   },
 
   ar: {
+    "seo.categoryDescription": "تسوّق {category} من المشربية أونلاين — منتجات عالية الجودة، وتوصيل سريع في جميع أنحاء قطر، مع إمكانية الدفع عند الاستلام.",
+    "home.title": "مستلزمات التنظيف واحتياجات المنزل في قطر",
+
     "common.loading": "جارٍ التحميل…",
     "common.save": "حفظ",
     "common.saving": "جارٍ الحفظ…",

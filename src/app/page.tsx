@@ -23,6 +23,15 @@ export default async function HomePage() {
 
   return (
     <div className="am-fade-in">
+      {/* The homepage had no <h1> at all before this — every other real
+          page here has its own (product name, category name, etc.), but
+          the single most SEO-important page on the whole site was
+          missing one entirely. Kept visually quiet (small, muted, no
+          bespoke banner of its own) so it doesn't compete with the real
+          banner carousel below — it exists for the real page topic Google
+          (and a screen reader) sees, not as a marketing headline. */}
+      <h1 className="sr-only">{t(locale, "home.title")}</h1>
+
       {banners.length > 0 && (
         <section className="pt-6 pb-2">
           <div className="max-w-[1280px] mx-auto px-5">

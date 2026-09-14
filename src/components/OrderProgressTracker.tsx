@@ -2,8 +2,16 @@
 
 import { useLanguage } from "@/lib/store/language";
 
-// A 4-stage visual tracker (Pending → Confirmed → Packed & Processed →
-// Delivered), matching the step-by-step design the user asked for.
+// A 5-stage visual tracker — Pending → Confirmed → Packaging → Out for
+// Delivery → Delivered — matching, one-to-one, the exact order_status
+// values and progression the real admin.almarwah.qa Laravel dashboard uses
+// for a forward-moving order (its own "Manage Status" dropdown lists
+// pending/confirmed/processing/out_for_delivery/delivered in that order,
+// labeling `processing` as "Packaging"). An earlier version of this
+// component collapsed "processing" and "out_for_delivery" into a single
+// step — a real, live order sitting at "out for delivery" then showed the
+// exact same step as one that had merely been packed, which didn't match
+// what the admin dashboard itself shows for that same order.
 //
 // Honest limitation, not silently glossed over: the real Laravel backend
 // has no status-history/audit-log table at all (confirmed by searching the
@@ -17,7 +25,8 @@ const STEPS = [
   { key: "pending", icon: "📄", labelKey: "track.stepPending" as const },
   { key: "confirmed", icon: "🛒", labelKey: "track.stepConfirmed" as const },
   { key: "processing", icon: "📦", labelKey: "track.stepProcessing" as const },
-  { key: "delivered", icon: "🚚", labelKey: "track.stepDelivered" as const },
+  { key: "out_for_delivery", icon: "🚚", labelKey: "track.stepOutForDelivery" as const },
+  { key: "delivered", icon: "🏠", labelKey: "track.stepDelivered" as const },
 ];
 
 function stepIndexForStatus(status: string | undefined): number {
@@ -27,10 +36,11 @@ function stepIndexForStatus(status: string | undefined): number {
     case "confirmed":
       return 1;
     case "processing":
-    case "out_for_delivery":
       return 2;
-    case "delivered":
+    case "out_for_delivery":
       return 3;
+    case "delivered":
+      return 4;
     default:
       return -1; // canceled / returned / failed / unrecognized
   }
@@ -51,11 +61,15 @@ export default function OrderProgressTracker({
   if (currentIndex === -1) {
     // canceled / returned / failed — a linear stepper implies steady
     // forward progress, which would misrepresent an order that stopped;
-    // a plain status message is the honest thing to show instead.
-    const label =
+    // a plain status badge + message is the honest thing to show instead.
+    const badge = status === "returned" ? t("track.stepReturned") : status === "failed" ? t("track.stepFailed") : t("track.stepCancelled");
+    const message =
       status === "returned" ? t("track.orderReturned") : status === "failed" ? t("track.orderFailed") : t("track.orderCancelled");
     return (
-      <div className="bg-am-error/10 text-am-error rounded-xl px-4 py-3.5 text-sm font-semibold text-center">{label}</div>
+      <div className="bg-am-error/10 rounded-xl px-4 py-3.5 text-center">
+        <div className="inline-block bg-am-error text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1 rounded-full mb-1.5">{badge}</div>
+        <p className="text-am-error text-sm font-semibold">{message}</p>
+      </div>
     );
   }
 
