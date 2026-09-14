@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { SiteSettings, CountdownPromo, ExitOffer } from "@/lib/settings/store.server";
 import CountdownPromosSection from "@/components/admin/CountdownPromosSection";
 import ExitOfferSection, { emptyExitOffer } from "@/components/admin/ExitOfferSection";
 import VisitorsSection from "@/components/admin/VisitorsSection";
+import LogoUploadField from "@/components/admin/LogoUploadField";
 import { useAdminSessionStore } from "@/lib/store/adminSession";
 import { useStoreConfig } from "@/lib/store/config";
 
@@ -200,13 +201,9 @@ function Dashboard() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [logoError, setLogoError] = useState("");
   const [autoFilledAt, setAutoFilledAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
   const [confirmingLogout, setConfirmingLogout] = useState(false);
-  const [logoDragOver, setLogoDragOver] = useState(false);
-  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -281,139 +278,24 @@ function Dashboard() {
     return saveNow({ exitOffer: offer });
   }
 
-  // Uploading a real logo is also the moment an admin is most likely
-  // setting up branding for the first time — so this fills in every other
-  // still-blank Branding field (Site Name/Tagline in both languages, Theme
-  // Colors, Address, Footer background) with the actual real values
-  // already live on the site, rather than leaving them blank for the
-  // admin to retype from scratch or guess at. Never overwrites a field
-  // that already has something in it — a field left untouched here always
-  // means "the admin deliberately typed this", logo upload or not.
-  //
-  // The logo is stored as a plain data: URI (no file-storage server this
-  // simple JSON-file settings store could write to — see store.server.ts's
-  // own docblock) — but a real phone-camera photo can easily be several MB,
-  // and reading THAT straight into base64 and POSTing it as part of the
-  // settings JSON was the actual, reported bug here: nothing validated the
-  // size, nothing surfaced an error if it failed, so a real admin trying to
-  // upload a real photo saw... nothing happen. Fixed by downscaling through
-  // a canvas first — a logo only ever needs to render at a few dozen
-  // pixels tall in the header, so capping it at 320px on the long side
-  // keeps the resulting data: URI small (typically tens of KB) regardless
-  // of how large the original photo was — and by actually surfacing an
-  // error message instead of failing silently if something still goes
-  // wrong.
-  const MAX_LOGO_SOURCE_BYTES = 15 * 1024 * 1024; // sanity cap before even trying to process
-  const LOGO_MAX_DIMENSION = 320;
-
-  // The actual upload logic — shared by the (now hidden, professionally
-  // re-skinned as a real "Upload Logo Image" button) file input's onChange
-  // AND drag-and-drop onto the dropzone, so both paths behave identically.
-  // `onDone` always runs exactly once, success or failure, and clears
-  // whatever native input triggered this (only relevant for the file-input
-  // path; the drop path passes a no-op).
-  function processLogoFile(file: File, onDone: () => void) {
-    setLogoError("");
-
-    if (!file.type.startsWith("image/")) {
-      setLogoError("Please choose an image file (PNG, JPG, WEBP…).");
-      onDone();
-      return;
+  // Uploading a real (header) logo is also the moment an admin is most
+  // likely setting up branding for the first time — so this fills in
+  // every other still-blank Branding field (Site Name/Tagline in both
+  // languages, Theme Colors, Address, Footer background) with the actual
+  // real values already live on the site, rather than leaving them blank
+  // for the admin to retype from scratch or guess at. Never overwrites a
+  // field that already has something in it. The footer logo (a genuinely
+  // separate image — see its own field below) intentionally has no such
+  // side effect; it's just its own value.
+  function onHeaderLogoChange(dataUrlOrUrl: string) {
+    setSettings((s) => withLiveDefaults({ ...s, logoUrl: dataUrlOrUrl }, config));
+    if (dataUrlOrUrl) {
+      // A visible confirmation, not just a quiet field-value change — the
+      // actual bug report behind this whole feature was "I can't tell
+      // whether anything happened", so this makes it unmistakable that
+      // the auto-fill really did run.
+      setAutoFilledAt(Date.now());
     }
-    if (file.size > MAX_LOGO_SOURCE_BYTES) {
-      setLogoError("That image is too large (max 15MB). Please choose a smaller file.");
-      onDone();
-      return;
-    }
-
-    // A hard ceiling on how long this is allowed to hang — if `img.onload`
-    // never fires for some real-world reason (a corrupt file, an
-    // unsupported format the browser silently rejects, etc.) the admin
-    // would otherwise be stuck on "Processing image…" forever with no
-    // error and no way to know why. 10s is generous for what's just a
-    // local FileReader + canvas resize.
-    const watchdog = setTimeout(() => {
-      setLogoUploading(false);
-      setLogoError("That took too long — please try a different image.");
-      onDone();
-    }, 10000);
-
-    setLogoUploading(true);
-    const reader = new FileReader();
-    reader.onerror = () => {
-      clearTimeout(watchdog);
-      setLogoUploading(false);
-      setLogoError("Couldn't read that file. Please try a different image.");
-      onDone();
-    };
-    reader.onload = () => {
-      try {
-        const img = new Image();
-        img.onerror = () => {
-          clearTimeout(watchdog);
-          setLogoUploading(false);
-          setLogoError("That doesn't look like a valid image file.");
-          onDone();
-        };
-        img.onload = () => {
-          try {
-            const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(img.width, img.height));
-            const canvas = document.createElement("canvas");
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
-            const ctx = canvas.getContext("2d");
-            if (!ctx) throw new Error("no 2d context");
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL("image/png");
-
-            setSettings((s) => withLiveDefaults({ ...s, logoUrl: dataUrl }, config));
-            // A visible confirmation, not just a quiet field-value change —
-            // the actual bug report behind this whole feature was "I can't
-            // tell whether anything happened", so this makes it unmistakable
-            // that the auto-fill really did run.
-            setAutoFilledAt(Date.now());
-          } catch {
-            setLogoError("Something went wrong processing that image. Please try a different file.");
-          } finally {
-            clearTimeout(watchdog);
-            setLogoUploading(false);
-            onDone();
-          }
-        };
-        img.src = reader.result as string;
-      } catch {
-        clearTimeout(watchdog);
-        setLogoUploading(false);
-        setLogoError("Something went wrong reading that image. Please try a different file.");
-        onDone();
-      }
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (!file) return;
-    // Previously cleared the input's own value the instant a file was
-    // picked (to allow re-selecting the exact same file a second time,
-    // since browsers don't fire another change event otherwise) — but
-    // that made the browser's own "filename selected" label revert to
-    // "No file selected" INSTANTLY, before the async processing below
-    // even started, which read as "my selection didn't register at all"
-    // to a real admin (the actual reported bug: a picked file looking
-    // like nothing happened). Now only reset once processing is truly
-    // finished, success or failure either way.
-    processLogoFile(file, () => {
-      input.value = "";
-    });
-  }
-
-  function onLogoDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setLogoDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processLogoFile(file, () => {});
   }
 
   async function save() {
@@ -596,73 +478,18 @@ function Dashboard() {
               <button onClick={() => setAutoFilledAt(null)} className="shrink-0 text-am-success/70 hover:text-am-success">✕</button>
             </div>
           )}
-          {/* A real, unmissable upload control — a plain unstyled native
-              <input type="file"> (the previous design) reads as inert or
-              broken to a lot of real admins, which was very likely the
-              actual cause of a genuine "I can't upload the logo" report:
-              nothing about "Browse... No file selected." in small grey
-              text looks like a working button. The native input still
-              does all the real work here (browsers require a real user
-              gesture directly on — or a synchronous .click() proxied
-              from — a file input to open the OS picker; there's no way
-              around that, nor should there be), it's just visually
-              hidden and triggered by this obvious, unmistakable button
-              and dropzone instead. */}
-          <input ref={logoFileInputRef} type="file" accept="image/*" onChange={onLogoFile} className="hidden" />
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setLogoDragOver(true);
-            }}
-            onDragLeave={() => setLogoDragOver(false)}
-            onDrop={onLogoDrop}
-            className={`flex items-center gap-4 mb-5 rounded-2xl border-2 border-dashed p-4 transition-colors ${
-              logoDragOver ? "border-am-primary bg-am-primary/5" : "border-am-border"
-            }`}
-          >
-            <div className="w-16 h-16 rounded-xl border border-am-border bg-am-bg shrink-0 flex items-center justify-center overflow-hidden">
-              {settings.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
-              ) : (
-                <span className="text-2xl opacity-40">🖼️</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => logoFileInputRef.current?.click()}
-                  disabled={logoUploading}
-                  className="inline-flex items-center gap-2 bg-am-primary hover:bg-am-primary-dark disabled:opacity-60 text-white text-[13px] font-bold px-5 py-2.5 rounded-full transition-colors shadow-[0_6px_16px_rgba(196,154,60,0.3)]"
-                >
-                  {logoUploading ? "Processing…" : "📤 Upload Logo Image"}
-                </button>
-                <span className="text-[12px] text-am-text-muted">or drag an image here</span>
-                {settings.logoUrl && !logoUploading && (
-                  <button
-                    onClick={() => {
-                      setSettings((s) => ({ ...s, logoUrl: "" }));
-                      setLogoError("");
-                    }}
-                    className="text-[12px] text-am-error font-semibold hover:underline"
-                  >
-                    Remove logo
-                  </button>
-                )}
-              </div>
-              {logoError && <p className="text-[12px] text-am-error font-semibold">{logoError}</p>}
-              <details className="text-[11.5px] text-am-text-faint">
-                <summary className="cursor-pointer hover:text-am-text-muted">Use an image URL instead</summary>
-                <input
-                  type="text"
-                  value={settings.logoUrl ?? ""}
-                  onChange={(e) => setSettings((s) => ({ ...s, logoUrl: e.target.value }))}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full mt-2 border border-am-border rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-am-primary"
-                />
-              </details>
-            </div>
+
+          <div className="mb-5">
+            <LogoUploadField label="Header Logo" value={settings.logoUrl ?? ""} onChange={onHeaderLogoChange} />
+          </div>
+
+          <div className="mb-5">
+            <LogoUploadField
+              label="Footer Logo"
+              hint="A separate image shown above the site name in the footer — leave empty to show just the name there, as before."
+              value={settings.footerLogoUrl ?? ""}
+              onChange={(v) => setSettings((s) => ({ ...s, footerLogoUrl: v }))}
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

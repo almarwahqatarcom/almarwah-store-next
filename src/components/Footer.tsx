@@ -21,6 +21,10 @@ export default function Footer() {
       <div className="max-w-[1280px] mx-auto px-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-9 pb-8 border-b border-white/10">
           <div className="col-span-2 md:col-span-1">
+            {siteSettings.footerLogoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={siteSettings.footerLogoUrl} alt={siteName} className="h-10 w-auto object-contain mb-2.5" />
+            )}
             <span className="text-white font-bold text-lg">{siteName}</span>
             <p className="text-[13.5px] mt-3 leading-relaxed">{t("footer.tagline")}</p>
           </div>

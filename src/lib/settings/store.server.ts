@@ -24,6 +24,15 @@ export interface SiteSettings {
   // external image URL. Falls back to the live backend's own logo
   // (config.ecommerce_logo) when unset.
   logoUrl?: string;
+  // A second, independent logo shown above the site name in the footer's
+  // first column (Footer.tsx) — genuinely a different image from the
+  // header's own logoUrl above in real use (a wordmark in the header vs.
+  // a compact emblem/seal in the footer is a common real design pattern),
+  // not just an alias for it. Falls back to showing nothing extra (just
+  // the site name text, as before) when unset — never falls back to
+  // logoUrl, since an admin who only ever sets ONE logo almost certainly
+  // means the header one, not "also put it in the footer too".
+  footerLogoUrl?: string;
   // Overrides the live backend's own config.ecommerce_name everywhere the
   // header/footer/page-title show the store's name — same "override, with
   // a real fallback" pattern as logoUrl above. Per-locale since the
