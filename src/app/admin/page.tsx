@@ -305,8 +305,8 @@ function Dashboard() {
   const LOGO_MAX_DIMENSION = 320;
 
   function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the exact same file later
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
     setLogoError("");
 
@@ -319,42 +319,80 @@ function Dashboard() {
       return;
     }
 
+    // Previously cleared the input's own value the instant a file was
+    // picked (to allow re-selecting the exact same file a second time,
+    // since browsers don't fire another change event otherwise) — but
+    // that made the browser's own "filename selected" label revert to
+    // "No file selected" INSTANTLY, before the async processing below
+    // even started, which read as "my selection didn't register at all"
+    // to a real admin (the actual reported bug: a picked file looking
+    // like nothing happened). Now only reset once processing is truly
+    // finished, success or failure either way, via resetInput() below.
+    function resetInput() {
+      input.value = "";
+    }
+
+    // A hard ceiling on how long this is allowed to hang — if `img.onload`
+    // never fires for some real-world reason (a corrupt file, an
+    // unsupported format the browser silently rejects, etc.) the admin
+    // would otherwise be stuck on "Processing image…" forever with no
+    // error and no way to know why. 10s is generous for what's just a
+    // local FileReader + canvas resize.
+    const watchdog = setTimeout(() => {
+      setLogoUploading(false);
+      setLogoError("That took too long — please try a different image.");
+      resetInput();
+    }, 10000);
+
     setLogoUploading(true);
     const reader = new FileReader();
     reader.onerror = () => {
+      clearTimeout(watchdog);
       setLogoUploading(false);
       setLogoError("Couldn't read that file. Please try a different image.");
+      resetInput();
     };
     reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => {
-        setLogoUploading(false);
-        setLogoError("That doesn't look like a valid image file.");
-      };
-      img.onload = () => {
-        try {
-          const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(img.width, img.height));
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.round(img.width * scale);
-          canvas.height = Math.round(img.height * scale);
-          const ctx = canvas.getContext("2d");
-          if (!ctx) throw new Error("no 2d context");
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL("image/png");
-
-          setSettings((s) => withLiveDefaults({ ...s, logoUrl: dataUrl }, config));
-          // A visible confirmation, not just a quiet field-value change —
-          // the actual bug report behind this whole feature was "I can't
-          // tell whether anything happened", so this makes it unmistakable
-          // that the auto-fill really did run.
-          setAutoFilledAt(Date.now());
-        } catch {
-          setLogoError("Something went wrong processing that image. Please try a different file.");
-        } finally {
+      try {
+        const img = new Image();
+        img.onerror = () => {
+          clearTimeout(watchdog);
           setLogoUploading(false);
-        }
-      };
-      img.src = reader.result as string;
+          setLogoError("That doesn't look like a valid image file.");
+          resetInput();
+        };
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(img.width, img.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("no 2d context");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/png");
+
+            setSettings((s) => withLiveDefaults({ ...s, logoUrl: dataUrl }, config));
+            // A visible confirmation, not just a quiet field-value change —
+            // the actual bug report behind this whole feature was "I can't
+            // tell whether anything happened", so this makes it unmistakable
+            // that the auto-fill really did run.
+            setAutoFilledAt(Date.now());
+          } catch {
+            setLogoError("Something went wrong processing that image. Please try a different file.");
+          } finally {
+            clearTimeout(watchdog);
+            setLogoUploading(false);
+            resetInput();
+          }
+        };
+        img.src = reader.result as string;
+      } catch {
+        clearTimeout(watchdog);
+        setLogoUploading(false);
+        setLogoError("Something went wrong reading that image. Please try a different file.");
+        resetInput();
+      }
     };
     reader.readAsDataURL(file);
   }
