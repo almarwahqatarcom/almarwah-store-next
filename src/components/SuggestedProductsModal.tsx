@@ -35,7 +35,6 @@ export default function SuggestedProductsModal({ products, onClose }: { products
       el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products.length]);
 
   useEffect(() => {
@@ -78,7 +77,6 @@ export default function SuggestedProductsModal({ products, onClose }: { products
       el.removeEventListener("mouseenter", pause);
       el.removeEventListener("mouseleave", resume);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products.length]);
 
   function scrollByPage(toward: "start" | "end") {

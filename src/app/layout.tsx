@@ -33,6 +33,22 @@ export async function generateMetadata(): Promise<Metadata> {
 // variables via a small inline <style> tag — only the keys an admin has
 // actually changed are emitted, so anything untouched keeps globals.css's
 // own default exactly as-is.
+//
+// The admin form's color fields include a free-text input alongside the
+// <input type="color"> picker (so a real hex code can be pasted directly),
+// which means this string is NOT guaranteed to already be a safe CSS value
+// by the time it gets here — the admin dashboard has no field-level
+// validation on save. Since this value is injected via
+// dangerouslySetInnerHTML into a raw <style> tag on every single page, an
+// unvalidated value could break out of the CSS declaration entirely (e.g.
+// "red;}</style><script>...") — low severity in practice (only the admin
+// account can trigger it), but still worth closing off as real
+// defense-in-depth rather than trusting free-text admin input verbatim in
+// server-rendered HTML. Anything that doesn't look like a plain CSS color
+// (hex, rgb()/rgba(), hsl()/hsla(), or a bare word like "gold") is dropped
+// silently, same as if the field had been left blank.
+const SAFE_CSS_COLOR = /^(#[0-9a-fA-F]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%]+\)|[a-zA-Z]+)$/;
+
 function themeOverrideCss(theme: Awaited<ReturnType<typeof getSiteSettings>>["theme"]): string | null {
   if (!theme) return null;
   const map: Record<string, string | undefined> = {
@@ -44,8 +60,8 @@ function themeOverrideCss(theme: Awaited<ReturnType<typeof getSiteSettings>>["th
     "--am-text": theme.text,
   };
   const declarations = Object.entries(map)
-    .filter(([, v]) => !!v)
-    .map(([k, v]) => `${k}:${v};`)
+    .filter(([, v]) => !!v && SAFE_CSS_COLOR.test(v!.trim()))
+    .map(([k, v]) => `${k}:${v!.trim()};`)
     .join("");
   return declarations ? `:root{${declarations}}` : null;
 }

@@ -72,7 +72,7 @@ export default function ExitOfferSection({ offer, onSave }: { offer: ExitOffer; 
       </div>
       <p className="text-[12px] text-am-text-muted mb-4">
         Shown once per visit, directly on the checkout page, after a visitor has sat there this long without placing the order — a last-chance
-        coupon offer, in both languages, applied immediately if they choose it. Nothing below takes effect until you click "Save Offer".
+        coupon offer, in both languages, applied immediately if they choose it. Nothing below takes effect until you click &ldquo;Save Offer&rdquo;.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">

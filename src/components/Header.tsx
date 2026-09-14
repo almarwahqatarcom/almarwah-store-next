@@ -50,7 +50,6 @@ export default function Header() {
     Promise.all([waitForCartHydration(), waitForAuthHydration()]).then(() => {
       useCartStore.getState().refresh(useAuthStore.getState().token);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Checked once per page load — see adminSession.ts for why this is a
@@ -248,6 +247,7 @@ export default function Header() {
             autoComplete="off"
             role="combobox"
             aria-expanded={showSuggestions && suggestions.length > 0}
+            aria-controls="header-search-suggestions"
             aria-autocomplete="list"
             className="w-full rounded-full border border-am-border bg-am-bg px-4 py-2.5 pe-11 text-sm focus:outline-none focus:border-am-primary focus:bg-white transition-colors"
           />
@@ -256,7 +256,7 @@ export default function Header() {
           </button>
 
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full inset-x-0 mt-2 bg-white border border-am-border rounded-2xl shadow-xl overflow-hidden z-[60]">
+            <div id="header-search-suggestions" role="listbox" className="absolute top-full inset-x-0 mt-2 bg-white border border-am-border rounded-2xl shadow-xl overflow-hidden z-[60]">
               {suggestions.map((p, i) => {
                 const thumb = imageUrl(config.base_urls, "product_image_url", p.image?.[0]);
                 const categoryId = p.category_ids?.[0] ? Number(p.category_ids[0].id) : null;

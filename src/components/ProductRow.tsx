@@ -36,7 +36,6 @@ export default function ProductRow({ title, products }: { title: string; product
       el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products.length]);
 
   function scrollByPage(toward: "start" | "end") {

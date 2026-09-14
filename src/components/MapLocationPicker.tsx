@@ -34,7 +34,14 @@ export default function MapLocationPicker({
   const [locating, setLocating] = useState(false);
   const [ready, setReady] = useState(false);
 
-  onChangeRef.current = onChange;
+  // Keeps the map's event handlers (bound once, below) always calling the
+  // latest onChange without needing the whole map to be torn down and
+  // rebuilt every time a parent re-renders with a new function identity —
+  // done in an effect (not directly in the render body) since mutating a
+  // ref is a side effect, not something render itself should do.
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   useEffect(() => {
     let cancelled = false;

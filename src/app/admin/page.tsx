@@ -374,7 +374,7 @@ function Dashboard() {
         {/* Theme colors */}
         <section className="bg-white border border-am-border rounded-2xl p-6">
           <h2 className="font-bold text-am-text mb-1">Theme Colors</h2>
-          <p className="text-[12px] text-am-text-muted mb-4">Leave a field blank to keep the site's default for it.</p>
+          <p className="text-[12px] text-am-text-muted mb-4">Leave a field blank to keep the site&apos;s default for it.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {THEME_FIELDS.map(({ key, label, hint }) => (
               <div key={key}>
@@ -404,7 +404,7 @@ function Dashboard() {
         {/* Logo & site name */}
         <section className="bg-white border border-am-border rounded-2xl p-6">
           <h2 className="font-bold text-am-text mb-1">Logo & Site Name</h2>
-          <p className="text-[12px] text-am-text-muted mb-4">Overrides the logo, name, and tagline shown in the header, footer, and browser tab. Leave a field blank to use the store's default.</p>
+          <p className="text-[12px] text-am-text-muted mb-4">Overrides the logo, name, and tagline shown in the header, footer, and browser tab. Leave a field blank to use the store&apos;s default.</p>
           <div className="flex items-center gap-4 mb-5">
             {settings.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -512,7 +512,7 @@ function Dashboard() {
         <section className="bg-white border border-am-border rounded-2xl p-6">
           <h2 className="font-bold text-am-text mb-1">Facebook Pixel</h2>
           <p className="text-[12px] text-am-text-muted mb-4">
-            Tracks page views, add-to-cart, and purchases for Facebook/Instagram ads. Leave blank to use the store's own pixel id (from its
+            Tracks page views, add-to-cart, and purchases for Facebook/Instagram ads. Leave blank to use the store&apos;s own pixel id (from its
             admin.almarwah.qa panel) if one is set there.
           </p>
           <div className="flex items-center gap-2 max-w-sm">

@@ -19,17 +19,23 @@ function findMatchingPromo(promos: CountdownPromo[] | undefined, productId: numb
   );
 }
 
+// Ticks once a second, tracking both "time left" and "the clock reading
+// that produced it" — the latter lets callers derive anything else
+// time-based (like "has this even started yet") from the same tick
+// instead of calling Date.now() fresh during render, which the render body
+// must stay pure (no direct clock/IO reads) to satisfy.
 function useCountdown(endAt: string) {
-  const [remaining, setRemaining] = useState<number | null>(null);
+  const [state, setState] = useState<{ remaining: number; now: number } | null>(null);
   useEffect(() => {
     function tick() {
-      setRemaining(Math.max(0, new Date(endAt).getTime() - Date.now()));
+      const now = Date.now();
+      setState({ remaining: Math.max(0, new Date(endAt).getTime() - now), now });
     }
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [endAt]);
-  return remaining;
+  return state;
 }
 
 export default function CountdownPromoBanner({ productId, categoryIds }: { productId: number; categoryIds: number[] }) {
@@ -41,11 +47,11 @@ export default function CountdownPromoBanner({ productId, categoryIds }: { produ
   // A promo with no end date can never render (avoids a hook-count crash
   // from calling useCountdown conditionally) — harmless since a real promo
   // always has one, set below.
-  const remaining = useCountdown(promo?.endAt ?? new Date(0).toISOString());
+  const tick = useCountdown(promo?.endAt ?? new Date(0).toISOString());
 
-  if (!promo || remaining === null) return null;
+  if (!promo || tick === null) return null;
 
-  const now = Date.now();
+  const { remaining, now } = tick;
   const started = now >= new Date(promo.startAt).getTime();
   const ended = remaining <= 0;
   if (!started || ended) return null;
