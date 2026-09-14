@@ -56,19 +56,17 @@ export default function Footer() {
               <li>📍 {address}</li>
             </ul>
             {(siteSettings.googlePlayUrl || siteSettings.appStoreUrl) && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-row flex-wrap items-center gap-2">
                 {siteSettings.googlePlayUrl && (
                   <a
                     href={siteSettings.googlePlayUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl px-3.5 py-2 transition-colors w-fit"
+                    aria-label={`${t("footer.getItOn")} Google Play`}
+                    className="inline-block opacity-90 hover:opacity-100 transition-opacity"
                   >
-                    <span className="text-xl leading-none">▶️</span>
-                    <span className="leading-tight">
-                      <span className="block text-[9.5px] text-white/60">{t("footer.getItOn")}</span>
-                      <span className="block text-[13px] font-bold text-white">Google Play</span>
-                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/badges/google-play-badge.png" alt="Get it on Google Play" className="h-9 w-auto rounded-md" />
                   </a>
                 )}
                 {siteSettings.appStoreUrl && (
@@ -76,13 +74,11 @@ export default function Footer() {
                     href={siteSettings.appStoreUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl px-3.5 py-2 transition-colors w-fit"
+                    aria-label={`${t("footer.downloadOnThe")} App Store`}
+                    className="inline-block opacity-90 hover:opacity-100 transition-opacity"
                   >
-                    <span className="text-xl leading-none"></span>
-                    <span className="leading-tight">
-                      <span className="block text-[9.5px] text-white/60">{t("footer.downloadOnThe")}</span>
-                      <span className="block text-[13px] font-bold text-white">App Store</span>
-                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/badges/app-store-badge.svg" alt="Download on the App Store" className="h-9 w-auto" />
                   </a>
                 )}
               </div>
