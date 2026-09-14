@@ -233,14 +233,13 @@ function Dashboard() {
   }
 
   // Uploading a real logo is also the moment an admin is most likely
-  // setting up branding for the first time — so this fills in the Site
-  // Name/Tagline fields with the actual real values already live on the
-  // site (config.ecommerce_name from the backend; the tagline the header
-  // already shows by default — see header.since in translations.ts) rather
-  // than leaving them blank for the admin to retype from scratch. Never
-  // overwrites a field that already has something in it — a field left
-  // untouched here always means "the admin deliberately typed this",
-  // logo upload or not.
+  // setting up branding for the first time — so this fills in every other
+  // still-blank Branding field (Site Name/Tagline in both languages, Theme
+  // Colors, Address, Footer background) with the actual real values
+  // already live on the site, rather than leaving them blank for the
+  // admin to retype from scratch or guess at. Never overwrites a field
+  // that already has something in it — a field left untouched here always
+  // means "the admin deliberately typed this", logo upload or not.
   //
   // The logo is stored as a plain data: URI (no file-storage server this
   // simple JSON-file settings store could write to — see store.server.ts's
@@ -307,6 +306,26 @@ function Dashboard() {
               en: s.tagline?.en || "Since 2003 · Qatar",
               ar: s.tagline?.ar || "منذ 2003 · قطر",
             },
+            // The site's real default palette — same hex values
+            // globals.css itself defines for --am-primary etc. — so a
+            // blank Theme Colors field no longer just shows a grey
+            // placeholder hint; it gets the actual value that's already
+            // live, ready to tweak from a real starting point instead of
+            // an empty box.
+            theme: {
+              primary: s.theme?.primary || "#C49A3C",
+              primaryDark: s.theme?.primaryDark || "#AB8530",
+              primaryLight: s.theme?.primaryLight || "#F0E4C8",
+              bg: s.theme?.bg || "#F8F4E9",
+              bgAlt: s.theme?.bgAlt || "#EDE3CC",
+              text: s.theme?.text || "#1A2942",
+            },
+            // The real address already shown site-wide (config's own
+            // ecommerce_address — see Header.tsx/Footer.tsx's own
+            // fallback) — and the footer's real default background
+            // (Footer.tsx falls back to bg-am-text, i.e. --am-text).
+            addressOverride: s.addressOverride || config.ecommerce_address,
+            footerBgColor: s.footerBgColor || "#1A2942",
           }));
         } catch {
           setLogoError("Something went wrong processing that image. Please try a different file.");
