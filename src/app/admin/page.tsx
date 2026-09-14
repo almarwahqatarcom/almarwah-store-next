@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SiteSettings, CountdownPromo, ExitOffer } from "@/lib/settings/store.server";
 import CountdownPromosSection from "@/components/admin/CountdownPromosSection";
 import ExitOfferSection, { emptyExitOffer } from "@/components/admin/ExitOfferSection";
@@ -205,6 +205,8 @@ function Dashboard() {
   const [autoFilledAt, setAutoFilledAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [logoDragOver, setLogoDragOver] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -304,32 +306,24 @@ function Dashboard() {
   const MAX_LOGO_SOURCE_BYTES = 15 * 1024 * 1024; // sanity cap before even trying to process
   const LOGO_MAX_DIMENSION = 320;
 
-  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (!file) return;
+  // The actual upload logic — shared by the (now hidden, professionally
+  // re-skinned as a real "Upload Logo Image" button) file input's onChange
+  // AND drag-and-drop onto the dropzone, so both paths behave identically.
+  // `onDone` always runs exactly once, success or failure, and clears
+  // whatever native input triggered this (only relevant for the file-input
+  // path; the drop path passes a no-op).
+  function processLogoFile(file: File, onDone: () => void) {
     setLogoError("");
 
     if (!file.type.startsWith("image/")) {
       setLogoError("Please choose an image file (PNG, JPG, WEBP…).");
+      onDone();
       return;
     }
     if (file.size > MAX_LOGO_SOURCE_BYTES) {
       setLogoError("That image is too large (max 15MB). Please choose a smaller file.");
+      onDone();
       return;
-    }
-
-    // Previously cleared the input's own value the instant a file was
-    // picked (to allow re-selecting the exact same file a second time,
-    // since browsers don't fire another change event otherwise) — but
-    // that made the browser's own "filename selected" label revert to
-    // "No file selected" INSTANTLY, before the async processing below
-    // even started, which read as "my selection didn't register at all"
-    // to a real admin (the actual reported bug: a picked file looking
-    // like nothing happened). Now only reset once processing is truly
-    // finished, success or failure either way, via resetInput() below.
-    function resetInput() {
-      input.value = "";
     }
 
     // A hard ceiling on how long this is allowed to hang — if `img.onload`
@@ -341,7 +335,7 @@ function Dashboard() {
     const watchdog = setTimeout(() => {
       setLogoUploading(false);
       setLogoError("That took too long — please try a different image.");
-      resetInput();
+      onDone();
     }, 10000);
 
     setLogoUploading(true);
@@ -350,7 +344,7 @@ function Dashboard() {
       clearTimeout(watchdog);
       setLogoUploading(false);
       setLogoError("Couldn't read that file. Please try a different image.");
-      resetInput();
+      onDone();
     };
     reader.onload = () => {
       try {
@@ -359,7 +353,7 @@ function Dashboard() {
           clearTimeout(watchdog);
           setLogoUploading(false);
           setLogoError("That doesn't look like a valid image file.");
-          resetInput();
+          onDone();
         };
         img.onload = () => {
           try {
@@ -383,7 +377,7 @@ function Dashboard() {
           } finally {
             clearTimeout(watchdog);
             setLogoUploading(false);
-            resetInput();
+            onDone();
           }
         };
         img.src = reader.result as string;
@@ -391,10 +385,35 @@ function Dashboard() {
         clearTimeout(watchdog);
         setLogoUploading(false);
         setLogoError("Something went wrong reading that image. Please try a different file.");
-        resetInput();
+        onDone();
       }
     };
     reader.readAsDataURL(file);
+  }
+
+  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    // Previously cleared the input's own value the instant a file was
+    // picked (to allow re-selecting the exact same file a second time,
+    // since browsers don't fire another change event otherwise) — but
+    // that made the browser's own "filename selected" label revert to
+    // "No file selected" INSTANTLY, before the async processing below
+    // even started, which read as "my selection didn't register at all"
+    // to a real admin (the actual reported bug: a picked file looking
+    // like nothing happened). Now only reset once processing is truly
+    // finished, success or failure either way.
+    processLogoFile(file, () => {
+      input.value = "";
+    });
+  }
+
+  function onLogoDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setLogoDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processLogoFile(file, () => {});
   }
 
   async function save() {
@@ -577,23 +596,50 @@ function Dashboard() {
               <button onClick={() => setAutoFilledAt(null)} className="shrink-0 text-am-success/70 hover:text-am-success">✕</button>
             </div>
           )}
-          <div className="flex items-center gap-4 mb-5">
-            {settings.logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={settings.logoUrl} alt="Logo preview" className="w-14 h-14 rounded-xl object-contain border border-am-border bg-am-bg" />
-            )}
-            <div className="flex-1 flex flex-col gap-2">
-              <input
-                type="text"
-                value={settings.logoUrl ?? ""}
-                onChange={(e) => setSettings((s) => ({ ...s, logoUrl: e.target.value }))}
-                placeholder="https://… or upload a file below"
-                className="w-full border border-am-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-am-primary"
-              />
-              <div className="flex items-center gap-3">
-                <input type="file" accept="image/*" onChange={onLogoFile} className="text-[12.5px]" />
-                {logoUploading && <span className="text-[12px] text-am-text-muted">Processing image…</span>}
-                {settings.logoUrl && (
+          {/* A real, unmissable upload control — a plain unstyled native
+              <input type="file"> (the previous design) reads as inert or
+              broken to a lot of real admins, which was very likely the
+              actual cause of a genuine "I can't upload the logo" report:
+              nothing about "Browse... No file selected." in small grey
+              text looks like a working button. The native input still
+              does all the real work here (browsers require a real user
+              gesture directly on — or a synchronous .click() proxied
+              from — a file input to open the OS picker; there's no way
+              around that, nor should there be), it's just visually
+              hidden and triggered by this obvious, unmistakable button
+              and dropzone instead. */}
+          <input ref={logoFileInputRef} type="file" accept="image/*" onChange={onLogoFile} className="hidden" />
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setLogoDragOver(true);
+            }}
+            onDragLeave={() => setLogoDragOver(false)}
+            onDrop={onLogoDrop}
+            className={`flex items-center gap-4 mb-5 rounded-2xl border-2 border-dashed p-4 transition-colors ${
+              logoDragOver ? "border-am-primary bg-am-primary/5" : "border-am-border"
+            }`}
+          >
+            <div className="w-16 h-16 rounded-xl border border-am-border bg-am-bg shrink-0 flex items-center justify-center overflow-hidden">
+              {settings.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-2xl opacity-40">🖼️</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => logoFileInputRef.current?.click()}
+                  disabled={logoUploading}
+                  className="inline-flex items-center gap-2 bg-am-primary hover:bg-am-primary-dark disabled:opacity-60 text-white text-[13px] font-bold px-5 py-2.5 rounded-full transition-colors shadow-[0_6px_16px_rgba(196,154,60,0.3)]"
+                >
+                  {logoUploading ? "Processing…" : "📤 Upload Logo Image"}
+                </button>
+                <span className="text-[12px] text-am-text-muted">or drag an image here</span>
+                {settings.logoUrl && !logoUploading && (
                   <button
                     onClick={() => {
                       setSettings((s) => ({ ...s, logoUrl: "" }));
@@ -601,11 +647,21 @@ function Dashboard() {
                     }}
                     className="text-[12px] text-am-error font-semibold hover:underline"
                   >
-                    Clear
+                    Remove logo
                   </button>
                 )}
               </div>
               {logoError && <p className="text-[12px] text-am-error font-semibold">{logoError}</p>}
+              <details className="text-[11.5px] text-am-text-faint">
+                <summary className="cursor-pointer hover:text-am-text-muted">Use an image URL instead</summary>
+                <input
+                  type="text"
+                  value={settings.logoUrl ?? ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, logoUrl: e.target.value }))}
+                  placeholder="https://example.com/logo.png"
+                  className="w-full mt-2 border border-am-border rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-am-primary"
+                />
+              </details>
             </div>
           </div>
 
