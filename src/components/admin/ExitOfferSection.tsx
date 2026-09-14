@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ExitOffer } from "@/lib/settings/store.server";
+import { ExitOfferCard } from "@/components/ExitOfferCard";
 
 export function emptyExitOffer(): ExitOffer {
   return {
@@ -34,6 +35,7 @@ export function emptyExitOffer(): ExitOffer {
 export default function ExitOfferSection({ offer, onSave }: { offer: ExitOffer; onSave: (offer: ExitOffer) => void }) {
   const [draft, setDraft] = useState<ExitOffer>(offer);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   function update<K extends keyof ExitOffer>(key: K, value: ExitOffer[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -163,16 +165,45 @@ export default function ExitOfferSection({ offer, onSave }: { offer: ExitOffer; 
         <p className="text-[11px] text-am-text-faint mt-1">Cancelled automatically the moment they place the order or leave checkout.</p>
       </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-am-border">
+      <div className="flex items-center gap-3 pt-4 border-t border-am-border flex-wrap">
         <button
           onClick={save}
           className="bg-am-primary hover:bg-am-primary-dark text-white font-bold px-5 py-2.5 rounded-full text-sm transition-colors"
         >
           Save Offer
         </button>
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="border border-am-border hover:border-am-primary text-am-text font-semibold px-5 py-2.5 rounded-full text-sm transition-colors"
+        >
+          👁 Preview
+        </button>
         {savedAt && <span className="text-am-success text-[12.5px] font-semibold">✓ Saved.</span>}
         {!canEnable && <span className="text-[11.5px] text-am-text-faint">Add a coupon code to enable this offer.</span>}
       </div>
+
+      {/* Shows exactly what shoppers will see — the current unsaved draft,
+          not what's saved — with no timer and no sessionStorage check to
+          fight. This is the reliable way to verify the offer looks right;
+          the real popup on /checkout is deliberately gated (see
+          CheckoutAbandonmentOffer.tsx) and can silently stay hidden in a
+          tab that's already seen it. */}
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-am-text/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewOpen(false);
+          }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-white text-[12px] font-bold uppercase tracking-wide bg-am-text/40 px-3 py-1 rounded-full">Preview — not visible to shoppers</span>
+            <ExitOfferCard offer={draft} applied={false} onApply={() => {}} onClose={() => setPreviewOpen(false)} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

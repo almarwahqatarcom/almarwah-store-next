@@ -13,6 +13,7 @@ import * as api from "@/lib/api";
 import { imageUrl } from "@/lib/api";
 import { scrollShelfState, scrollShelfBy } from "@/lib/scrollShelf";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useAdminSessionStore } from "@/lib/store/adminSession";
 import type { Product } from "@/lib/types";
 
 export default function Header() {
@@ -29,6 +30,9 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const cartItems = useCartStore((s) => s.items);
   const { token, user, logout } = useAuthStore();
+  const isAdmin = useAdminSessionStore((s) => s.isAdmin);
+  const checkAdminSession = useAdminSessionStore((s) => s.check);
+  const adminLogout = useAdminSessionStore((s) => s.logout);
   const didInit = useRef(false);
   const navScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollStart, setCanScrollStart] = useState(false);
@@ -46,6 +50,14 @@ export default function Header() {
     Promise.all([waitForCartHydration(), waitForAuthHydration()]).then(() => {
       useCartStore.getState().refresh(useAuthStore.getState().token);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Checked once per page load — see adminSession.ts for why this is a
+  // shared store rather than a local fetch (so /admin's own logout is
+  // instantly reflected here too, without a page reload).
+  useEffect(() => {
+    checkAdminSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -188,10 +200,27 @@ export default function Header() {
       <div className="bg-am-text text-white/85 text-[12.5px]">
         <div className="max-w-[1280px] mx-auto px-5 py-1.5 flex items-center justify-between gap-2">
           <span className="truncate">📞 {config.ecommerce_phone} &nbsp;•&nbsp; {address}</span>
-          <div className="hidden sm:flex gap-4">
+          <div className="hidden sm:flex items-center gap-4">
             <a href="https://almarwah.qa/branches.php" className="hover:text-am-primary transition-colors">{t("header.findBranch")}</a>
             <Link href="/track-order" className="hover:text-am-primary transition-colors">{t("header.trackOrder")}</Link>
             <a href="https://almarwah.qa/contact.php" className="hover:text-am-primary transition-colors">{t("header.contactUs")}</a>
+            {isAdmin && (
+              <>
+                <span className="w-px h-3 bg-white/20" />
+                <Link href="/admin" className="flex items-center gap-1 font-semibold text-am-primary hover:text-am-primary-light transition-colors">
+                  🛠️ {t("header.dashboard")}
+                </Link>
+                <button
+                  onClick={() => {
+                    adminLogout();
+                    if (pathname?.startsWith("/admin")) router.push("/");
+                  }}
+                  className="hover:text-am-error transition-colors"
+                >
+                  {t("header.adminLogout")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -56,6 +56,8 @@ export const translations = {
     "header.scrollCategoriesForward": "Scroll categories forward",
     "header.language": "Language",
     "header.trackOrder": "Track Order",
+    "header.dashboard": "Dashboard",
+    "header.adminLogout": "Logout",
     "header.seeAllResults": "See all results for",
 
     // ── Footer ──────────────────────────────────────────────────────────
@@ -421,6 +423,8 @@ export const translations = {
     "header.scrollCategoriesForward": "تمرير الفئات للأمام",
     "header.language": "اللغة",
     "header.trackOrder": "تتبع الطلب",
+    "header.dashboard": "لوحة التحكم",
+    "header.adminLogout": "تسجيل الخروج",
     "header.seeAllResults": "عرض كل النتائج لـ",
 
     "footer.tagline": "الاسم الموثوق في قطر لمنتجات التنظيف ومستلزمات المنزل منذ عام 2003 — أكثر من 35 فرعًا، و2500+ منتج، وخطوط حصرية لن تجدها في مكان آخر.",
