@@ -1,25 +1,34 @@
 // Server-only. A deliberately minimal session mechanism for the one-user
-// admin dashboard — no user table, no password hashing library dependency
-// beyond Node's own `crypto` (already built in).
+// admin dashboard.
 //
 // Stateless signed token, NOT a server-side session store: the cookie
 // value itself is `${expiresAt}.${hmac}`, where the HMAC is computed over
 // expiresAt with ADMIN_SESSION_SECRET. Validating just means recomputing
 // that HMAC and checking it matches — there is nothing to read or write on
-// disk/in a database at all, so there's nothing for a redeploy to wipe.
-// This replaces an earlier design (a JSON file of issued tokens, later a
-// SITE_DATA_DIR variant of the same idea) that assumed one server with one
-// persistent disk; this app is actually deployed on a serverless host
-// where that file was wiped on every deploy, silently signing every admin
-// back out. The real, if minor, tradeoff of going stateless: logout can
-// only make the browser forget the cookie, not truly invalidate the token
-// early — a copy of it made before logout would still work until its own
-// 7-day expiry. For a single-admin dashboard already gated by
-// ADMIN_EMAIL/ADMIN_PASSWORD and only ever handed out as an httpOnly
-// cookie, that's a reasonable, common trade for "never silently logged out
-// by infrastructure you don't control the disk of" — worth knowing about,
-// not worth the complexity of a real revocation list for this use case.
+// disk/in a database at all for the SESSION itself, so there's nothing for
+// a redeploy to wipe. This replaces an earlier design (a JSON file of
+// issued tokens, later a SITE_DATA_DIR variant of the same idea) that
+// assumed one server with one persistent disk; this app is actually
+// deployed on a serverless host where that file was wiped on every
+// deploy, silently signing every admin back out. The real, if minor,
+// tradeoff of going stateless: logout can only make the browser forget
+// the cookie, not truly invalidate the token early — a copy of it made
+// before logout would still work until its own 7-day expiry. For a
+// single-admin dashboard already gated by a real credential check and
+// only ever handed out as an httpOnly cookie, that's a reasonable, common
+// trade for "never silently logged out by infrastructure you don't
+// control the disk of" — worth knowing about, not worth the complexity of
+// a real revocation list for this use case.
+//
+// The credential CHECK itself (verifyCredentials, below) is different —
+// unlike the session token, that identity needs to actually persist and
+// be changeable without a redeploy, so it lives in Supabase's admin_users
+// table (see credentials.server.ts and supabase/schema.sql) instead of the
+// ADMIN_EMAIL/ADMIN_PASSWORD plaintext env vars this used to check
+// directly.
 import { createHmac, timingSafeEqual } from "crypto";
+import { getSupabase } from "@/lib/supabase.server";
+import { verifyPasswordHash } from "./credentials.server";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
@@ -33,24 +42,27 @@ function sign(expiresAt: number): string {
   return createHmac("sha256", secret()).update(String(expiresAt)).digest("hex");
 }
 
-// Constant-time comparison — a plain `===` on credentials leaks how many
-// leading characters matched via response-time differences (a real, if
-// minor, timing side-channel), which `timingSafeEqual` avoids. Both
-// buffers must be equal length for it to run at all, so length is checked
-// first (that check itself doesn't leak anything useful to an attacker).
-export function verifyCredentials(email: string, password: string): boolean {
-  const expectedEmail = process.env.ADMIN_EMAIL ?? "";
-  const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
-  if (!expectedEmail || !expectedPassword) return false;
+// Looks the email up in admin_users and checks the password against its
+// stored scrypt hash (verifyPasswordHash is itself constant-time — see
+// credentials.server.ts). A missing row and a wrong password take the same
+// path (return false) and the login route already replies with the same
+// "Invalid email or password" either way, so this doesn't hand out any
+// extra timing signal beyond what a real database lookup already costs.
+export async function verifyCredentials(email: string, password: string): Promise<boolean> {
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail || !password) return false;
 
-  const emailBuf = Buffer.from(email);
-  const expectedEmailBuf = Buffer.from(expectedEmail);
-  const passwordBuf = Buffer.from(password);
-  const expectedPasswordBuf = Buffer.from(expectedPassword);
-
-  const emailMatches = emailBuf.length === expectedEmailBuf.length && timingSafeEqual(emailBuf, expectedEmailBuf);
-  const passwordMatches = passwordBuf.length === expectedPasswordBuf.length && timingSafeEqual(passwordBuf, expectedPasswordBuf);
-  return emailMatches && passwordMatches;
+  try {
+    const { data, error } = await getSupabase()
+      .from("admin_users")
+      .select("password_hash")
+      .eq("email", trimmedEmail)
+      .maybeSingle();
+    if (error || !data) return false;
+    return verifyPasswordHash(password, data.password_hash);
+  } catch {
+    return false;
+  }
 }
 
 export async function createSession(): Promise<string> {

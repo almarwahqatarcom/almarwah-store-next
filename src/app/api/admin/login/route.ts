@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const email = (body.email ?? "").trim();
   const password = body.password ?? "";
 
-  if (!verifyCredentials(email, password)) {
+  if (!(await verifyCredentials(email, password))) {
     recentFailures.push(now);
     failedAttemptsByIp.set(ip, recentFailures);
     // Same message either way — not confirming whether the email itself

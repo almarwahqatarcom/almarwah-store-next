@@ -41,10 +41,25 @@ create table if not exists storefront_visits (
 
 create index if not exists storefront_visits_visited_at_idx on storefront_visits (visited_at);
 
+-- The admin dashboard's own login (see src/lib/settings/credentials.server.ts
+-- and session.server.ts) — replaces the earlier ADMIN_EMAIL/ADMIN_PASSWORD
+-- plaintext env vars, which meant "changing the admin password" required
+-- editing and redeploying, and meant the real password sat in plaintext in
+-- an env file. password_hash is never the plain password — see
+-- credentials.server.ts for the scrypt format (`salt:hash`, hex-encoded).
+-- Multiple rows work fine (more than one admin) even though today's login
+-- route only ever looks up one.
+create table if not exists admin_users (
+  email text primary key,
+  password_hash text not null,
+  updated_at timestamptz not null default now()
+);
+
 -- Row Level Security stays ON (Supabase's default for new tables) with NO
--- policies defined for either table. That means the public `anon` key can
+-- policies defined for any of these. That means the public `anon` key can
 -- do nothing here at all — every read/write in this app goes through the
 -- `service_role` key instead (see src/lib/supabase.server.ts), which
 -- bypasses RLS entirely by design. Nothing further to configure.
 alter table storefront_settings enable row level security;
 alter table storefront_visits enable row level security;
+alter table admin_users enable row level security;
