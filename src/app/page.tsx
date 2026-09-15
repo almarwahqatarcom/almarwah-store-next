@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getBanners, getCategories, getDailyNeeds, getFeatured, getMostReviewed, getConfig, imageUrl } from "@/lib/api";
 import ProductRow from "@/components/ProductRow";
+import CategoryThumb from "@/components/CategoryThumb";
 import { getServerLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/t";
 import type { Product } from "@/lib/types";
@@ -65,7 +66,10 @@ export default async function HomePage() {
                 return (
                   <Link key={c.id} href={`/category/${c.id}`} className="text-center group">
                     <div className="w-[84px] h-[84px] mx-auto mb-2.5 rounded-full bg-white border border-am-border flex items-center justify-center overflow-hidden shadow-sm transition-all group-hover:-translate-y-1 group-hover:shadow-[0_8px_26px_rgba(196,154,60,0.16)] group-hover:border-am-primary relative">
-                      {img && <Image src={img} alt={c.name} fill sizes="84px" className="object-cover" />}
+                      {/* See CategoryThumb.tsx: retries once, then falls back to a plain
+                          placeholder, for a rare decode hiccup confirmed live under heavy
+                          concurrent load — the image itself is never actually broken. */}
+                      {img && <CategoryThumb src={img} alt={c.name} />}
                     </div>
                     <div className="text-[12.5px] font-semibold text-am-text am-line-clamp-2 leading-tight">{c.name}</div>
                   </Link>

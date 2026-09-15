@@ -197,9 +197,16 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-am-card border-b border-am-border shadow-sm">
       <div className="bg-am-text text-white/85 text-[12.5px]">
-        <div className="max-w-[1280px] mx-auto px-5 py-1.5 flex items-center justify-between gap-2">
+        {/* flex-wrap (not "hidden sm:flex" on the links, as this was before) — on a
+            narrow phone there isn't room for the phone/address AND every link on one
+            line, but hiding the links entirely left mobile visitors with literally no
+            header way to reach Track Order (or an admin any way to reach /admin or log
+            out) short of knowing the URL. Wrapping to a second line keeps everything
+            reachable at every width instead of trading real functionality for a
+            single tidy row. */}
+        <div className="max-w-[1280px] mx-auto px-5 py-1.5 flex items-center flex-wrap justify-between gap-x-2 gap-y-1">
           <span className="truncate">📞 {config.ecommerce_phone} &nbsp;•&nbsp; {address}</span>
-          <div className="hidden sm:flex items-center gap-4">
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1">
             <a href="https://almarwah.qa/branches.php" className="hover:text-am-primary transition-colors">{t("header.findBranch")}</a>
             <Link href="/track-order" className="hover:text-am-primary transition-colors">{t("header.trackOrder")}</Link>
             <a href="https://almarwah.qa/contact.php" className="hover:text-am-primary transition-colors">{t("header.contactUs")}</a>
@@ -226,7 +233,15 @@ export default function Header() {
 
       <div className="max-w-[1280px] mx-auto px-5 py-3 flex items-center gap-4 md:gap-7 flex-wrap">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          {logo && <Image src={logo} alt={siteName} width={40} height={40} className="h-10 w-auto" priority />}
+          {/* Plain <img>, not next/image: the real logo (admin-uploaded data: URI, or the
+              backend's own remote image) is essentially never square, so a fixed
+              width={40} height={40} — needed to even use next/image — was a wrong,
+              made-up aspect ratio fighting the "h-10 w-auto" CSS that actually renders
+              it correctly. That mismatch is exactly what Next.js warns about (reserved
+              layout space not matching the rendered size), confirmed live: a real
+              320×105 logo rendering at 122×40. Matches Footer.tsx's own logo handling. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {logo && <img src={logo} alt={siteName} className="h-10 w-auto object-contain" fetchPriority="high" />}
           <span className="font-bold text-lg text-am-text leading-tight">
             {siteName}
             <small className="block text-[10px] font-medium text-am-primary-dark tracking-widest uppercase">{tagline}</small>
