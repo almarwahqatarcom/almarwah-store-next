@@ -1,23 +1,16 @@
-// Server-only. Persists admin-configurable site overrides through the real
-// Laravel backend (StorefrontController::getSettings/updateSettings — see
-// that controller's docblock) instead of a local file on this app's own
-// disk. A local file (the original design, and briefly a SITE_DATA_DIR
-// variant of it) only works on a single always-on server with a
-// persistent disk it fully controls; this app is actually deployed on a
-// serverless host with neither — every deploy replaces the filesystem
-// entirely, and even within one deploy, separate requests can land on
-// separate, isolated instances with no shared disk between them. Confirmed
-// live: an admin's saved logo/links were empty again after the very next
-// deploy. Routing storage through the Laravel backend (which already has
-// one real, shared database every instance talks to) fixes both — a save
-// survives redeploys, and is visible to every instance immediately.
-import { API_BASE } from "@/lib/api";
+// Server-only. Persists admin-configurable site overrides in Supabase (see
+// src/lib/supabase.server.ts for the full rationale) instead of a local
+// file on this app's own disk — a local file (the original design, and
+// briefly a SITE_DATA_DIR variant of it) only works on a single always-on
+// server with a persistent disk it fully controls; this app is actually
+// deployed on a serverless host with neither. Confirmed live: an admin's
+// saved logo/links were empty again after the very next deploy.
+// Deliberately Next.js-only — no Laravel backend changes or deploys
+// required for any of this.
+import { getSupabase } from "@/lib/supabase.server";
 
-const STOREFRONT_API_SECRET = process.env.STOREFRONT_API_SECRET ?? "";
-
-function authHeaders(): Record<string, string> {
-  return { "X-Storefront-Internal-Secret": STOREFRONT_API_SECRET };
-}
+const SETTINGS_TABLE = "storefront_settings";
+const SETTINGS_KEY = "site_settings";
 
 export interface SiteSettings {
   theme?: {
@@ -198,19 +191,21 @@ const EMPTY: SiteSettings = {};
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   try {
-    // no-store: this is read on nearly every page render (logo, theme,
-    // nav copy, …) and must reflect an admin's save immediately — a stale
-    // cached read here is exactly the "saved but not showing" bug this
-    // whole migration exists to fix, just moved from storage to caching.
-    const res = await fetch(`${API_BASE}/storefront/settings`, {
-      headers: authHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) return EMPTY;
-    return (await res.json()) as SiteSettings;
+    // One row, keyed by SETTINGS_KEY — the whole settings object lives as
+    // one jsonb value, same shape this app has always kept it in. No
+    // Supabase-side caching to worry about: every read hits the database
+    // directly, which is exactly what "reflect an admin's save
+    // immediately" needs.
+    const { data, error } = await getSupabase()
+      .from(SETTINGS_TABLE)
+      .select("value")
+      .eq("key", SETTINGS_KEY)
+      .maybeSingle();
+    if (error || !data) return EMPTY;
+    return (data.value as SiteSettings) ?? EMPTY;
   } catch {
-    // Backend unreachable — same graceful "use defaults" fallback the
-    // local-file version had for a missing/corrupt file.
+    // Supabase unreachable/misconfigured — same graceful "use defaults"
+    // fallback the local-file version had for a missing/corrupt file.
     return EMPTY;
   }
 }
@@ -227,17 +222,11 @@ export async function saveSiteSettings(patch: SiteSettings): Promise<SiteSetting
     seo: { ...current.seo, ...patch.seo },
     updatedAt: new Date().toISOString(),
   };
-  // The merge above happens here, same as it always did — the backend
-  // does a plain overwrite of whatever full object it's given (see
-  // StorefrontController::updateSettings), it has no idea of this type's
-  // shape and isn't meant to.
-  const res = await fetch(`${API_BASE}/storefront/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(next),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to save site settings (backend responded ${res.status})`);
+  const { error } = await getSupabase()
+    .from(SETTINGS_TABLE)
+    .upsert({ key: SETTINGS_KEY, value: next, updated_at: next.updatedAt }, { onConflict: "key" });
+  if (error) {
+    throw new Error(`Failed to save site settings (${error.message})`);
   }
   return next;
 }
